@@ -46,7 +46,10 @@
         <div id="dashboard-page">
             <div class="flex flex-col h-screen">
                 <header class="bg-white shadow-md w-full p-4 flex justify-between items-center z-10">
-                    <div><h1 class="text-2xl font-bold text-primary">Verantwoordingen Dashboard</h1><p class="text-sm text-gray-500">Jouw centrale overzicht</p></div>
+                    <div>
+                        <h1 class="text-2xl font-bold text-primary">Derdengeld Verantwoording</h1>
+                        <p class="text-sm text-gray-500">Dashboard</p>
+                    </div>
                     <div class="flex items-center gap-4"><span id="user-welcome" class="text-sm font-medium">Welkom...</span><button id="btn-go-to-new-form" class="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-lg shadow-sm"> + Nieuw Formulier </button></div>
                 </header>
                 <main class="flex-grow p-4 md:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-y-auto">
@@ -278,7 +281,29 @@
             return `<div class="text-sm p-3 bg-gray-100 rounded-md"><p>${log}</p></div>`;
         }
         
-        function renderDeeltaken() { /* ... (blijft hetzelfde) ... */ }
+        function renderDeeltaken() {
+            const container = document.getElementById('deeltaken-lijst');
+            const placeholder = document.getElementById('deeltaken-placeholder');
+            container.querySelectorAll('.deeltaak-item').forEach(el => el.remove());
+
+            if (deeltakenBuffer.length === 0) {
+                placeholder.classList.remove('hidden');
+            } else {
+                placeholder.classList.add('hidden');
+                deeltakenBuffer.forEach((taak, index) => {
+                    const taakElement = document.createElement('div');
+                    taakElement.className = 'deeltaak-item bg-subtle p-4 rounded-md border flex items-center justify-between';
+                    taakElement.innerHTML = `
+                        <div>
+                            <p class="font-semibold">${taak.taakblok}</p>
+                            <p class="text-sm text-gray-600">Bedrag: € ${parseFloat(taak.bedrag).toFixed(2)} - Toegewezen aan: <span class="font-medium">${taak.collega}</span></p>
+                        </div>
+                        <button type="button" data-index="${index}" class="btn-remove-task text-gray-400 hover:text-red-600 text-xl">&times;</button>
+                    `;
+                    container.appendChild(taakElement);
+                });
+            }
+        }
 
         function populateTaskView(form, taak) {
             activeTask = { formId: form.id, taakId: taak.id }; 
@@ -311,9 +336,59 @@
         }
 
         // --- LOGICA FUNCTIES ---
-        function addDeeltaak() { /* ... (blijft hetzelfde) ... */ }
+        function addDeeltaak() {
+            const collega = document.getElementById('modal-collega').value;
+            const bedrag = document.getElementById('modal-deelbedrag').value;
+            const selectedTaakblokken = Array.from(document.querySelectorAll('#modal-taakblok-container input[type="checkbox"]:checked')).map(cb => cb.value);
+            const taakblok = selectedTaakblokken.join(', ') || 'Algemene Verantwoording';
 
-        function saveNewForm(singleAssignee = null) { /* ... (blijft hetzelfde) ... */ }
+            if (!collega || !bedrag) {
+                showNotification('Selecteer een collega en vul een bedrag in.', 'error');
+                return;
+            }
+
+            deeltakenBuffer.push({ id: `taak_${Date.now()}_${Math.random()}`, collega, taakblok, bedrag: parseFloat(bedrag), status: 'open' });
+            renderDeeltaken();
+            updateAmountValidation();
+            closeModal();
+        }
+
+        function saveNewForm(singleAssignee = null) {
+            const form = {
+                id: `form_${Date.now()}`,
+                totaalbedrag: parseFloat(document.getElementById('totaalbedrag').value) || 0,
+                transactiedatum: document.getElementById('transactiedatum').value,
+                omschrijving: document.getElementById('omschrijving').value,
+                aangemaaktDoor: currentUserDisplayName,
+                deeltaken: deeltakenBuffer
+            };
+
+            if (!form.totaalbedrag || !form.transactiedatum) {
+                showNotification('Vul het totaalbedrag en de transactiedatum in.', 'error');
+                return;
+            }
+
+            if (deeltakenBuffer.length === 0) {
+                if (singleAssignee) {
+                    deeltakenBuffer.push({ id: `taak_${Date.now()}`, collega: singleAssignee, taakblok: 'Volledige Verantwoording', bedrag: form.totaalbedrag, status: 'open' });
+                    form.deeltaken = deeltakenBuffer;
+                } else {
+                    openSingleAssignModal();
+                    return;
+                }
+            }
+            
+            const deeltakenTotaal = deeltakenBuffer.reduce((sum, taak) => sum + taak.bedrag, 0);
+            if (deeltakenTotaal !== form.totaalbedrag) {
+                const verschil = form.totaalbedrag - deeltakenTotaal;
+                showNotification(`Deeltaken-totaal (€${deeltakenTotaal.toFixed(2)}) komt niet overeen met het hoofdbedrag. Verschil: €${verschil.toFixed(2)}. Voeg een rest-taak toe.`, 'error');
+                return;
+            }
+
+            database.push(form);
+            showNotification('Formulier succesvol aangemaakt!', 'success');
+            resetAndShowPage(pages.dashboard);
+        }
 
         function completeActiveTask() {
             if (!activeTask) return;
@@ -351,30 +426,68 @@
             }
         }
         
-        function resetNewForm() { /* ... (blijft hetzelfde) ... */ }
-        function updateAmountValidation() { /* ... (blijft hetzelfde) ... */ }
-        function logActivity(message) {
-            activityLog.push(message);
+        function resetNewForm() {
+            document.getElementById('new-form-element').reset();
+            deeltakenBuffer = [];
+            renderDeeltaken();
         }
+        
+        function updateAmountValidation() {
+            const display = document.getElementById('amount-validation-display');
+            const totaal = parseFloat(document.getElementById('totaalbedrag').value) || 0;
+            const deeltakenTotaal = deeltakenBuffer.reduce((sum, taak) => sum + taak.bedrag, 0);
+            const verschil = totaal - deeltakenTotaal;
+
+            if (verschil === 0 && totaal > 0) {
+                display.innerHTML = `<span class="font-semibold text-green-600">Bedragen komen overeen!</span>`;
+            } else {
+                display.innerHTML = `<span>Totaal deeltaken: <span class="font-bold">€ ${deeltakenTotaal.toFixed(2)}</span></span><br><span>Resterend: <span class="font-bold text-red-600">€ ${verschil.toFixed(2)}</span></span>`;
+            }
+        }
+
+        // --- UI & NAVIGATIE ---
+        function showNotification(message, type = 'info') {
+             const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `hidden`; 
+            const bgColor = type === 'success' ? 'bg-green-600' : 'bg-red-600';
+            notification.classList.add(bgColor);
+            notification.classList.remove('hidden');
+            setTimeout(() => { notification.classList.add('hidden'); }, 3000);
+        }
+        
+        const pages = {
+            dashboard: document.getElementById('dashboard-page'),
+            newForm: document.getElementById('new-form-page'),
+            taskView: document.getElementById('task-view-page')
+        };
+        const modal = document.getElementById('add-task-modal');
+        const singleAssignModal = document.getElementById('assign-single-task-modal');
+
+        function showPage(pageToShow) {
+            Object.values(pages).forEach(p => p.classList.add('hidden'));
+            pageToShow.classList.remove('hidden');
+            if (pageToShow === pages.dashboard) renderDashboard();
+        }
+
+        function resetAndShowPage(pageToShow) {
+            resetNewForm();
+            showPage(pageToShow);
+        }
+
+        const openModal = () => modal.classList.remove('hidden');
+        const closeModal = () => {
+            document.querySelectorAll('#modal-taakblok-container input[type="checkbox"]').forEach(cb => cb.checked = false);
+            modal.classList.add('hidden');
+        }
+        const openSingleAssignModal = () => singleAssignModal.classList.remove('hidden');
+        const closeSingleAssignModal = () => singleAssignModal.classList.add('hidden');
+
         function findTask(formId, taakId) {
             const form = database.find(f => f.id === formId);
             const taak = form ? form.deeltaken.find(t => t.id === taakId) : undefined;
             return { form, taak };
         }
-
-        // --- UI & NAVIGATIE ---
-        function showNotification(message, type = 'info') { /* ... (blijft hetzelfde) ... */ }
-        
-        const pages = { /* ... (blijft hetzelfde) ... */ };
-        const modal = document.getElementById('add-task-modal');
-        const singleAssignModal = document.getElementById('assign-single-task-modal');
-
-        function showPage(pageToShow) { /* ... (blijft hetzelfde) ... */ }
-        function resetAndShowPage(pageToShow) { /* ... (blijft hetzelfde) ... */ }
-        const openModal = () => modal.classList.remove('hidden');
-        const closeModal = () => { /* ... (blijft hetzelfde) ... */ }
-        const openSingleAssignModal = () => singleAssignModal.classList.remove('hidden');
-        const closeSingleAssignModal = () => singleAssignModal.classList.add('hidden');
 
         // --- EVENT LISTENERS ---
         function setupEventListeners() {
@@ -391,7 +504,11 @@
                 if (target.id === 'btn-close-modal') closeModal();
                 if (target.id === 'btn-add-task') addDeeltaak();
                 if (target.id === 'btn-close-single-assign-modal') closeSingleAssignModal();
-                if (target.id === 'btn-assign-single-task') { /* ... (blijft hetzelfde) ... */ }
+                if (target.id === 'btn-assign-single-task') {
+                    const assignee = document.getElementById('single-assign-collega').value;
+                    saveNewForm(assignee);
+                    closeSingleAssignModal();
+                }
 
                 const taskCard = target.closest('.task-card');
                 if (taskCard) {
@@ -403,7 +520,11 @@
                 }
 
                 const removeBtn = target.closest('.btn-remove-task');
-                if (removeBtn) { /* ... (blijft hetzelfde) ... */ }
+                if (removeBtn) {
+                    deeltakenBuffer.splice(removeBtn.dataset.index, 1);
+                    renderDeeltaken();
+                    updateAmountValidation();
+                }
             });
             
             const totaalbedragInput = document.getElementById('totaalbedrag');
