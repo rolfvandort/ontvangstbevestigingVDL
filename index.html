@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Functioneel Prototype - Verantwoordingen</title>
+    <title>Werkende App - Verantwoordingen</title>
     <!-- Tailwind CSS voor snelle styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Font 'Inter' zoals in je voorbeeld -->
@@ -21,7 +21,7 @@
         .text-accent { color: #19AACD; }
         .border-accent { border-color: #19AACD; }
         .bg-subtle { background-color: #F8FBFC; }
-        .readonly-input { background-color: #e9ecef; opacity: 0.7; }
+        .readonly-input { background-color: #e9ecef; opacity: 0.7; cursor: not-allowed; }
         /* Stijl voor de custom notificatie */
         #notification {
             position: fixed;
@@ -65,7 +65,7 @@
                     <a href="#" class="btn-back-to-dashboard text-sm font-medium text-gray-600 hover:text-primary">&larr; Terug naar Dashboard</a>
                 </header>
                 <main class="flex-grow p-4 md:p-6 lg:p-8 flex justify-center items-start">
-                    <div class="w-full max-w-4xl bg-white rounded-lg shadow-xl overflow-hidden">
+                    <form id="new-form-element" class="w-full max-w-4xl bg-white rounded-lg shadow-xl overflow-hidden">
                         <section class="p-6 border-b">
                             <h2 class="text-xl font-semibold mb-4 text-primary">Hoofdgegevens</h2>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -88,11 +88,46 @@
                             <div id="deeltaken-lijst" class="space-y-4">
                                 <p id="deeltaken-placeholder" class="text-sm text-gray-500 text-center">Nog geen deeltaken toegevoegd.</p>
                             </div>
-                            <button id="btn-open-modal" class="mt-6 w-full flex justify-center items-center px-4 py-2 border border-dashed border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">+ Deeltaak Toevoegen</button>
+                            <button type="button" id="btn-open-modal" class="mt-6 w-full flex justify-center items-center px-4 py-2 border border-dashed border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">+ Deeltaak Toevoegen</button>
                         </section>
                         <footer class="bg-gray-50 p-4 flex justify-end items-center gap-4">
-                            <button class="btn-back-to-dashboard text-sm font-medium text-gray-600 hover:text-gray-900">Annuleren</button>
-                            <button id="btn-save-form" class="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-5 rounded-lg shadow-sm">Starten & Notificaties Versturen</button>
+                            <button type="button" class="btn-back-to-dashboard text-sm font-medium text-gray-600 hover:text-gray-900">Annuleren</button>
+                            <button type="button" id="btn-save-form" class="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-5 rounded-lg shadow-sm">Starten & Notificaties Versturen</button>
+                        </footer>
+                    </form>
+                </main>
+            </div>
+        </div>
+
+        <!-- PAGINA 3: TAAK UITVOEREN (standaard verborgen) -->
+        <div id="task-view-page" class="hidden">
+            <div class="flex flex-col min-h-screen">
+                <header class="bg-white shadow-md w-full p-4 flex justify-between items-center z-10">
+                    <div>
+                        <h1 id="task-view-title" class="text-2xl font-bold text-primary">Verantwoording Laden...</h1>
+                        <p id="task-view-subtitle" class="text-sm text-gray-500">Aangemaakt door: ...</p>
+                    </div>
+                    <a href="#" class="btn-back-to-dashboard text-sm font-medium text-gray-600 hover:text-primary">&larr; Terug naar Dashboard</a>
+                </header>
+                <main class="flex-grow p-4 md:p-6 lg:p-8 flex justify-center items-start">
+                    <div class="w-full max-w-4xl bg-white rounded-lg shadow-xl overflow-hidden">
+                        <section id="task-view-header" class="p-6 bg-accent text-white">
+                            <!-- Inhoud wordt dynamisch geladen -->
+                        </section>
+                        <section class="p-6 border-b">
+                            <!-- Invulvelden voor de taak -->
+                             <label class="block text-sm font-medium text-gray-700">Toelichting</label>
+                             <textarea rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" placeholder="Voeg hier je opmerkingen toe..."></textarea>
+                        </section>
+                        <section class="p-6 border-b bg-gray-50">
+                            <h2 class="text-xl font-semibold mb-4 text-gray-600">Hoofdgegevens (informatief)</h2>
+                            <div id="task-view-main-data" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <!-- Hoofdgegevens worden dynamisch geladen -->
+                            </div>
+                        </section>
+                        <footer class="bg-gray-50 p-4 flex justify-end items-center gap-4">
+                            <button class="text-sm font-medium text-red-600 hover:text-red-900">Taak Terugsturen</button>
+                            <button class="btn-back-to-dashboard bg-primary hover:bg-primary-dark text-white font-bold py-2 px-5 rounded-lg shadow-sm">Taak Afronden</button>
                         </footer>
                     </div>
                 </main>
@@ -101,13 +136,13 @@
         
         <!-- MODAL: DEELTAAK TOEVOEGEN (standaard verborgen) -->
         <div id="add-task-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center p-4 z-50">
-            <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg">
+             <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg">
                 <header class="p-4 border-b"><h2 class="text-xl font-semibold text-primary">Deeltaak Toevoegen</h2></header>
                 <main class="p-6 space-y-4">
                     <div>
                         <label for="modal-collega" class="block text-sm font-medium text-gray-700">Wijs toe aan collega:</label>
                         <select id="modal-collega" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
-                            <option>Anna de Wit</option><option>Jan de Vries</option><option>Piet Jansen</option>
+                            <option>Anna de Wit</option><option>Jan de Vries</option><option>Piet Jansen</option><option>Test Gebruiker</option>
                         </select>
                     </div>
                     <div>
@@ -132,8 +167,8 @@
                     </div>
                 </main>
                 <footer class="bg-gray-50 p-4 flex justify-end items-center gap-4 rounded-b-lg">
-                    <button id="btn-close-modal" class="text-sm font-medium text-gray-600 hover:text-gray-900">Annuleren</button>
-                    <button id="btn-add-task" class="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-5 rounded-lg shadow-sm">Taak Toevoegen</button>
+                    <button type="button" id="btn-close-modal" class="text-sm font-medium text-gray-600 hover:text-gray-900">Annuleren</button>
+                    <button type="button" id="btn-add-task" class="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-5 rounded-lg shadow-sm">Taak Toevoegen</button>
                 </footer>
             </div>
         </div>
@@ -141,99 +176,146 @@
     
     <div id="notification" class="hidden"></div>
 
-    <!-- Firebase SDK Scripts -->
+    <!-- HET SCRIPT DAT DE APP LAAT WERKEN -->
     <script type="module">
-        // Geen Firebase import of configuratie in deze prototype-versie om fouten te voorkomen.
-        
+        // --- LOKALE DATABASE & STAAT ---
+        let database = []; // Ons lokale geheugen voor formulieren
         let currentUserId = 'test-user-id';
-        let deeltaken = []; // Array om deeltaken tijdelijk op te slaan
+        let currentUserDisplayName = 'Test Gebruiker';
+        let deeltakenBuffer = []; // Tijdelijke opslag voor deeltaken in het formulier
 
-        // Initialiseer de app bij het laden van de pagina
+        // --- INITIALISATIE ---
         document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('user-welcome').textContent = `Welkom, Test Gebruiker`;
-            renderDashboard(getMockTasks());
+            document.getElementById('user-welcome').textContent = `Welkom, ${currentUserDisplayName}`;
+            renderDashboard();
             setupEventListeners();
         });
 
-        function renderDashboard(tasks) {
+        // --- RENDER FUNCTIES ---
+        function renderDashboard() {
             const myTasksContainer = document.getElementById('my-tasks-container');
             const otherTasksContainer = document.getElementById('other-tasks-container');
             myTasksContainer.innerHTML = '';
             otherTasksContainer.innerHTML = '';
-            if (tasks.length === 0) {
-                myTasksContainer.innerHTML = '<p class="text-sm text-gray-500">Je hebt geen openstaande taken.</p>';
-                return;
-            }
-            const myTasks = tasks.slice(0, 1); 
-            const otherTasks = tasks.slice(1);
-            myTasks.forEach(task => {
-                myTasksContainer.innerHTML += `<div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-accent"><h3 class="font-bold text-primary">Verantwoording #${task.id.substring(0,6)}</h3><p class="text-sm text-gray-600 mt-1">Totaalbedrag: € ${task.totalAmount.toFixed(2)}</p><p class="text-sm font-semibold mt-2">Jouw taak: ${task.description}</p></div>`;
-            });
-            otherTasks.forEach(task => {
-                otherTasksContainer.innerHTML += `<div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-gray-300"><h3 class="font-bold text-gray-700">Verantwoording #${task.id.substring(0,6)}</h3><p class="text-sm mt-2">Wacht op <span class="font-semibold">${task.assignee}</span> (${task.description})</p></div>`;
-            });
+
+            const allTasks = database.flatMap(form => 
+                form.deeltaken.map(taak => ({ ...taak, formId: form.id, formOmschrijving: form.omschrijving, aangemaaktDoor: form.aangemaaktDoor, totaalbedrag: form.totaalbedrag, transactiedatum: form.transactiedatum }))
+            );
+
+            const myTasks = allTasks.filter(taak => taak.collega === currentUserDisplayName);
+            const otherTasks = allTasks.filter(taak => taak.collega !== currentUserDisplayName);
+
+            if (myTasks.length === 0) myTasksContainer.innerHTML = '<p class="text-sm text-gray-500">Je hebt geen openstaande taken.</p>';
+            myTasks.forEach(taak => myTasksContainer.innerHTML += createTaskCard(taak, true));
+
+            if (otherTasks.length === 0) otherTasksContainer.innerHTML = '<p class="text-sm text-gray-500">Er zijn geen andere openstaande taken.</p>';
+            otherTasks.forEach(taak => otherTasksContainer.innerHTML += createTaskCard(taak, false));
+        }
+
+        function createTaskCard(taak, isMine) {
+            const borderColor = isMine ? 'border-accent' : 'border-gray-300';
+            const titleColor = isMine ? 'text-primary' : 'text-gray-700';
+            // Sla de volledige taak-data op in een data-attribuut
+            return `
+                <div class="bg-white p-4 rounded-lg shadow-md border-l-4 ${borderColor} cursor-pointer task-card" data-form-id="${taak.formId}" data-taak-collega="${taak.collega}">
+                    <h3 class="font-bold ${titleColor}">Formulier: ${taak.formOmschrijving}</h3>
+                    <p class="text-sm font-semibold mt-2">Taak: ${taak.taakblok} (€ ${taak.bedrag.toFixed(2)})</p>
+                    ${!isMine ? `<p class="text-sm mt-1">Wacht op: <span class="font-semibold">${taak.collega}</span></p>` : ''}
+                </div>`;
         }
         
         function renderDeeltaken() {
             const container = document.getElementById('deeltaken-lijst');
             const placeholder = document.getElementById('deeltaken-placeholder');
-            container.innerHTML = ''; 
+            container.querySelectorAll('.deeltaak-item').forEach(el => el.remove());
 
-            if (deeltaken.length === 0) {
-                container.appendChild(placeholder);
+            if (deeltakenBuffer.length === 0) {
                 placeholder.classList.remove('hidden');
             } else {
                 placeholder.classList.add('hidden');
-                deeltaken.forEach((taak, index) => {
+                deeltakenBuffer.forEach((taak, index) => {
                     const taakElement = document.createElement('div');
-                    taakElement.className = 'bg-subtle p-4 rounded-md border flex items-center justify-between';
+                    taakElement.className = 'deeltaak-item bg-subtle p-4 rounded-md border flex items-center justify-between';
                     taakElement.innerHTML = `
                         <div>
                             <p class="font-semibold">${taak.taakblok}</p>
                             <p class="text-sm text-gray-600">Bedrag: € ${parseFloat(taak.bedrag).toFixed(2)} - Toegewezen aan: <span class="font-medium">${taak.collega}</span></p>
                         </div>
-                        <button data-index="${index}" class="btn-remove-task text-gray-400 hover:text-red-600 text-xl">&times;</button>
+                        <button type="button" data-index="${index}" class="btn-remove-task text-gray-400 hover:text-red-600 text-xl">&times;</button>
                     `;
                     container.appendChild(taakElement);
                 });
             }
         }
 
+        function populateTaskView(form, taak) {
+            document.getElementById('task-view-title').textContent = `Formulier: ${form.omschrijving}`;
+            document.getElementById('task-view-subtitle').textContent = `Aangemaakt door: ${form.aangemaaktDoor}`;
+            
+            const header = document.getElementById('task-view-header');
+            header.innerHTML = `
+                <h2 class="text-2xl font-bold">Jouw Taak: ${taak.taakblok}</h2>
+                <p class="mt-1">Voeg de benodigde documenten en een toelichting toe voor het bedrag van <strong>€ ${taak.bedrag.toFixed(2)}</strong>.</p>
+            `;
+
+            const mainData = document.getElementById('task-view-main-data');
+            mainData.innerHTML = `
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Totaalbedrag formulier</label>
+                    <input type="text" value="€ ${form.totaalbedrag.toFixed(2)}" class="mt-1 block w-full rounded-md readonly-input" readonly>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Datum van transactie</label>
+                    <input type="text" value="${form.transactiedatum}" class="mt-1 block w-full rounded-md readonly-input" readonly>
+                </div>
+            `;
+        }
+
+        // --- LOGICA FUNCTIES ---
         function addDeeltaak() {
             const collega = document.getElementById('modal-collega').value;
             const taakblok = document.getElementById('modal-taakblok').value;
             const bedrag = document.getElementById('modal-deelbedrag').value;
 
             if (!collega || !taakblok || !bedrag) {
-                showNotification('Vul alle velden in om een deeltaak toe te voegen.', 'error');
+                showNotification('Vul alle velden in.', 'error');
                 return;
             }
 
-            deeltaken.push({ collega, taakblok, bedrag: parseFloat(bedrag) });
+            deeltakenBuffer.push({ collega, taakblok, bedrag: parseFloat(bedrag) });
             renderDeeltaken();
             closeModal();
         }
 
-        function removeDeeltaak(index) {
-            deeltaken.splice(index, 1);
-            renderDeeltaken();
-        }
-
         function saveNewForm() {
-            showNotification('Formulier (fictief) opgeslagen!', 'success');
-            resetAndShowPage(document.getElementById('dashboard-page'));
+            const form = {
+                id: `form_${Date.now()}`, // Uniek ID genereren
+                totaalbedrag: parseFloat(document.getElementById('totaalbedrag').value) || 0,
+                transactiedatum: document.getElementById('transactiedatum').value,
+                omschrijving: document.getElementById('omschrijving').value,
+                aangemaaktDoor: currentUserDisplayName,
+                deeltaken: deeltakenBuffer
+            };
+
+            if (!form.totaalbedrag || !form.transactiedatum || !form.omschrijving || form.deeltaken.length === 0) {
+                showNotification('Vul alle velden in en voeg minimaal één deeltaak toe.', 'error');
+                return;
+            }
+
+            database.push(form);
+            showNotification('Formulier succesvol aangemaakt!', 'success');
+            resetAndShowPage(pages.dashboard);
         }
         
         function resetNewForm() {
-            document.getElementById('totaalbedrag').value = '';
-            document.getElementById('transactiedatum').value = '';
-            document.getElementById('omschrijving').value = '';
-            deeltaken = [];
+            document.getElementById('new-form-element').reset();
+            deeltakenBuffer = [];
             renderDeeltaken();
         }
 
+        // --- UI & NAVIGATIE ---
         function showNotification(message, type = 'info') {
-            const notification = document.getElementById('notification');
+             const notification = document.getElementById('notification');
             notification.textContent = message;
             notification.className = `hidden`; 
             const bgColor = type === 'success' ? 'bg-green-600' : 'bg-red-600';
@@ -241,37 +323,51 @@
             notification.classList.remove('hidden');
             setTimeout(() => { notification.classList.add('hidden'); }, 3000);
         }
-
-        function getMockTasks() { return [ { id: 'xyz123abc', totalAmount: 150000.00, description: "Verantwoording 'Medische kosten'", assignee: "Jij" }, { id: 'def456ghi', totalAmount: 5250.00, description: "Verantwoording 'Reiskosten'", assignee: "Piet Jansen" }, { id: 'jkl789mno', totalAmount: 12000.00, description: "Zaakschade", assignee: "Anna de Wit" } ]; }
         
-        const dashboardPage = document.getElementById('dashboard-page');
-        const newFormPage = document.getElementById('new-form-page');
-        const addTaskModal = document.getElementById('add-task-modal');
-
-        const showPage = (pageToShow) => {
-            dashboardPage.classList.add('hidden');
-            newFormPage.classList.add('hidden');
-            pageToShow.classList.remove('hidden');
+        const pages = {
+            dashboard: document.getElementById('dashboard-page'),
+            newForm: document.getElementById('new-form-page'),
+            taskView: document.getElementById('task-view-page')
         };
-        const resetAndShowPage = (pageToShow) => {
+        const modal = document.getElementById('add-task-modal');
+
+        function showPage(pageToShow) {
+            Object.values(pages).forEach(p => p.classList.add('hidden'));
+            pageToShow.classList.remove('hidden');
+            if (pageToShow === pages.dashboard) renderDashboard();
+        }
+
+        function resetAndShowPage(pageToShow) {
             resetNewForm();
             showPage(pageToShow);
         }
-        const openModal = () => addTaskModal.classList.remove('hidden');
-        const closeModal = () => {
-            document.getElementById('modal-deelbedrag').value = '';
-            addTaskModal.classList.add('hidden');
-        }
 
-        // --- Event Listeners ---
+        const openModal = () => modal.classList.remove('hidden');
+        const closeModal = () => modal.classList.add('hidden');
+
+        // --- EVENT LISTENERS ---
         function setupEventListeners() {
-            document.getElementById('btn-go-to-new-form').addEventListener('click', () => showPage(newFormPage));
+            document.getElementById('btn-go-to-new-form').addEventListener('click', () => showPage(pages.newForm));
             
-            // Gebruik event delegation voor alle 'terug' knoppen
             document.body.addEventListener('click', function(e) {
-                if (e.target.classList.contains('btn-back-to-dashboard')) {
+                const backButton = e.target.closest('.btn-back-to-dashboard');
+                if (backButton) {
                     e.preventDefault();
-                    resetAndShowPage(dashboardPage);
+                    resetAndShowPage(pages.dashboard);
+                }
+
+                const taskCard = e.target.closest('.task-card');
+                if (taskCard) {
+                    const formId = taskCard.dataset.formId;
+                    const taakCollega = taskCard.dataset.taakCollega;
+                    
+                    const form = database.find(f => f.id === formId);
+                    const taak = form ? form.deeltaken.find(t => t.collega === taakCollega) : undefined;
+
+                    if (form && taak) {
+                        populateTaskView(form, taak);
+                        showPage(pages.taskView);
+                    }
                 }
             });
 
@@ -279,9 +375,12 @@
             document.getElementById('btn-open-modal').addEventListener('click', openModal);
             document.getElementById('btn-close-modal').addEventListener('click', closeModal);
             document.getElementById('btn-add-task').addEventListener('click', addDeeltaak);
+            
             document.getElementById('deeltaken-lijst').addEventListener('click', (e) => {
-                if (e.target.classList.contains('btn-remove-task')) {
-                    removeDeeltaak(e.target.dataset.index);
+                if (e.target.closest('.btn-remove-task')) {
+                    const index = e.target.closest('.btn-remove-task').dataset.index;
+                    deeltakenBuffer.splice(index, 1);
+                    renderDeeltaken();
                 }
             });
         }
