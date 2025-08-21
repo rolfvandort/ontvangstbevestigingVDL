@@ -386,6 +386,7 @@
             }
 
             database.push(form);
+            logActivity(`<span class="font-semibold">${currentUserDisplayName}</span> heeft een nieuw formulier aangemaakt.`);
             showNotification('Formulier succesvol aangemaakt!', 'success');
             resetAndShowPage(pages.dashboard);
         }
@@ -444,6 +445,16 @@
                 display.innerHTML = `<span>Totaal deeltaken: <span class="font-bold">€ ${deeltakenTotaal.toFixed(2)}</span></span><br><span>Resterend: <span class="font-bold text-red-600">€ ${verschil.toFixed(2)}</span></span>`;
             }
         }
+        
+        function logActivity(message) {
+            activityLog.push(message);
+        }
+
+        function findTask(formId, taakId) {
+            const form = database.find(f => f.id === formId);
+            const taak = form ? form.deeltaken.find(t => t.id === taakId) : undefined;
+            return { form, taak };
+        }
 
         // --- UI & NAVIGATIE ---
         function showNotification(message, type = 'info') {
@@ -482,12 +493,6 @@
         }
         const openSingleAssignModal = () => singleAssignModal.classList.remove('hidden');
         const closeSingleAssignModal = () => singleAssignModal.classList.add('hidden');
-
-        function findTask(formId, taakId) {
-            const form = database.find(f => f.id === formId);
-            const taak = form ? form.deeltaken.find(t => t.id === taakId) : undefined;
-            return { form, taak };
-        }
 
         // --- EVENT LISTENERS ---
         function setupEventListeners() {
