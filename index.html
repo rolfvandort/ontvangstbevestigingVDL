@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Verantwoordingen</title>
+    <title>Klikbaar Prototype - Verantwoordingen</title>
     <!-- Tailwind CSS voor snelle styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Font 'Inter' zoals in je voorbeeld -->
@@ -11,7 +11,7 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         body { 
             font-family: 'Inter', sans-serif; 
-            background-color: #f0f4f9; /* Lichte achtergrondkleur uit je voorbeeld */
+            background-color: #f0f4f9;
         }
         /* Definieer de custom kleuren uit je voorbeeld voor hergebruik */
         .bg-primary { background-color: #0E3190; }
@@ -20,136 +20,228 @@
         .bg-accent { background-color: #19AACD; }
         .text-accent { color: #19AACD; }
         .border-accent { border-color: #19AACD; }
+        .bg-subtle { background-color: #F8FBFC; }
+        .readonly-input { background-color: #e9ecef; opacity: 0.7; }
     </style>
 </head>
 <body class="text-gray-800">
 
-    <!-- Hoofdcontainer voor de hele pagina -->
-    <div class="flex flex-col h-screen">
+    <!-- Dit is de container voor de hele applicatie -->
+    <div id="app-container">
 
-        <!-- Header sectie -->
-        <header class="bg-white shadow-md w-full p-4 flex justify-between items-center z-10">
-            <div>
-                <h1 class="text-2xl font-bold text-primary">Verantwoordingen Dashboard</h1>
-                <p class="text-sm text-gray-500">Jouw centrale overzicht</p>
+        <!-- PAGINA 1: DASHBOARD -->
+        <div id="dashboard-page">
+            <div class="flex flex-col h-screen">
+                <header class="bg-white shadow-md w-full p-4 flex justify-between items-center z-10">
+                    <div>
+                        <h1 class="text-2xl font-bold text-primary">Verantwoordingen Dashboard</h1>
+                        <p class="text-sm text-gray-500">Jouw centrale overzicht</p>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <span class="text-sm font-medium">Welkom, [Naam Medewerker]</span>
+                        <button id="btn-go-to-new-form" class="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-lg shadow-sm transition-colors duration-300">
+                            + Nieuw Formulier
+                        </button>
+                    </div>
+                </header>
+                <main class="flex-grow p-4 md:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-y-auto">
+                    <section class="flex flex-col">
+                        <h2 class="text-lg font-semibold mb-4 pb-2 border-b-2 border-accent">Mijn Openstaande Taken</h2>
+                        <div class="space-y-4 overflow-y-auto">
+                            <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-accent transition-transform hover:scale-105 cursor-pointer task-card">
+                                <h3 class="font-bold text-primary">Verantwoording #1024</h3>
+                                <p class="text-sm text-gray-600 mt-1">Totaalbedrag: € 150.000,00</p>
+                                <p class="text-sm font-semibold mt-2">Jouw taak: Verantwoording 'Medische kosten'</p>
+                            </div>
+                            <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-accent transition-transform hover:scale-105 cursor-pointer task-card">
+                                <h3 class="font-bold text-primary">Verantwoording #1022</h3>
+                                <p class="text-sm text-gray-600 mt-1">Totaalbedrag: € 5.250,00</p>
+                                <p class="text-sm font-semibold mt-2">Jouw taak: Verantwoording 'Reiskosten' goedkeuren</p>
+                            </div>
+                        </div>
+                    </section>
+                    <section class="flex flex-col">
+                        <h2 class="text-lg font-semibold mb-4 pb-2 border-b-2 border-gray-300">Wachtend op Anderen</h2>
+                        <div class="space-y-4 overflow-y-auto">
+                            <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-gray-300">
+                                <h3 class="font-bold text-gray-700">Verantwoording #1025</h3>
+                                <p class="text-sm mt-2">Wacht op <span class="font-semibold">Piet Jansen</span> (Zaakschade)</p>
+                            </div>
+                            <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-gray-300 opacity-70">
+                                <h3 class="font-bold text-gray-700">Verantwoording #1024</h3>
+                                <p class="text-sm mt-2">Wacht op <span class="font-semibold">[Jouw Naam]</span> (Medische kosten)</p>
+                                <p class="text-sm mt-1">Wacht op <span class="font-semibold">Anna de Wit</span> (Verlies verdienvermogen)</p>
+                            </div>
+                        </div>
+                    </section>
+                    <section class="flex flex-col">
+                        <h2 class="text-lg font-semibold mb-4 pb-2 border-b-2 border-gray-300">Recente Activiteit</h2>
+                        <div class="space-y-3 overflow-y-auto">
+                            <div class="text-sm p-3 bg-gray-100 rounded-md">
+                                <p><span class="font-semibold">Fatima</span> heeft formulier <span class="font-semibold">#1025</span> aangemaakt.</p>
+                                <p class="text-xs text-gray-500">2 minuten geleden</p>
+                            </div>
+                        </div>
+                    </section>
+                </main>
             </div>
-            <div class="flex items-center gap-4">
-                <span class="text-sm font-medium">Welkom, [Naam Medewerker]</span>
-                <button id="add-new-form" class="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-lg shadow-sm transition-colors duration-300">
-                    + Nieuw Formulier
-                </button>
+        </div>
+
+        <!-- PAGINA 2: NIEUW FORMULIER (standaard verborgen) -->
+        <div id="new-form-page" class="hidden">
+            <div class="flex flex-col min-h-screen">
+                <header class="bg-white shadow-md w-full p-4 flex justify-between items-center z-10">
+                    <div>
+                        <h1 class="text-2xl font-bold text-primary">Nieuwe Verantwoording Starten</h1>
+                        <p class="text-sm text-gray-500">Vul de basisgegevens in en wijs deeltaken toe.</p>
+                    </div>
+                    <a href="#" class="btn-back-to-dashboard text-sm font-medium text-gray-600 hover:text-primary transition-colors">
+                        &larr; Terug naar Dashboard
+                    </a>
+                </header>
+                <main class="flex-grow p-4 md:p-6 lg:p-8 flex justify-center items-start">
+                    <div class="w-full max-w-4xl bg-white rounded-lg shadow-xl overflow-hidden">
+                        <section class="p-6 border-b">
+                            <h2 class="text-xl font-semibold mb-4 text-primary">Hoofdgegevens</h2>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label for="totaalbedrag" class="block text-sm font-medium text-gray-700">Totaal te verantwoorden bedrag</label>
+                                    <div class="mt-1 relative rounded-md shadow-sm">
+                                        <div class="pointer-events-none absolute inset-y-0 left-0 pl-3 flex items-center"><span class="text-gray-500 sm:text-sm">€</span></div>
+                                        <input type="number" id="totaalbedrag" class="block w-full rounded-md border-gray-300 pl-7 pr-12 sm:text-lg" placeholder="150000.00">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="transactiedatum" class="block text-sm font-medium text-gray-700">Datum van transactie</label>
+                                    <input type="date" id="transactiedatum" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
+                                </div>
+                            </div>
+                        </section>
+                        <section class="p-6">
+                            <h2 class="text-xl font-semibold mb-4 text-primary">Deelverantwoordingen</h2>
+                            <div id="deeltaken-lijst" class="space-y-4"></div>
+                            <button id="btn-open-modal" class="mt-6 w-full flex justify-center items-center px-4 py-2 border border-dashed border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                                + Deeltaak Toevoegen
+                            </button>
+                        </section>
+                        <footer class="bg-gray-50 p-4 flex justify-end items-center gap-4">
+                            <button class="btn-back-to-dashboard text-sm font-medium text-gray-600 hover:text-gray-900">Annuleren</button>
+                            <button class="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-5 rounded-lg shadow-sm">Starten & Notificaties Versturen</button>
+                        </footer>
+                    </div>
+                </main>
             </div>
-        </header>
+        </div>
 
-        <!-- Dashboard content met de kolommen -->
-        <main class="flex-grow p-4 md:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-y-auto">
+        <!-- PAGINA 3: TAAK UITVOEREN (standaard verborgen) -->
+        <div id="task-view-page" class="hidden">
+            <div class="flex flex-col min-h-screen">
+                <header class="bg-white shadow-md w-full p-4 flex justify-between items-center z-10">
+                    <div>
+                        <h1 class="text-2xl font-bold text-primary">Verantwoording #1024</h1>
+                        <p class="text-sm text-gray-500">Aangemaakt door: Jan de Vries</p>
+                    </div>
+                    <a href="#" class="btn-back-to-dashboard text-sm font-medium text-gray-600 hover:text-primary transition-colors">
+                        &larr; Terug naar Dashboard
+                    </a>
+                </header>
+                <main class="flex-grow p-4 md:p-6 lg:p-8 flex justify-center items-start">
+                    <div class="w-full max-w-4xl bg-white rounded-lg shadow-xl overflow-hidden">
+                        <section class="p-6 bg-accent text-white">
+                            <h2 class="text-2xl font-bold">Jouw Taak: Medische kosten</h2>
+                            <p class="mt-1">Voeg de benodigde documenten en een toelichting toe voor het bedrag van <strong>€ 60.000,00</strong>.</p>
+                        </section>
+                        <section class="p-6 border-b">
+                            <!-- Invulvelden voor de taak -->
+                        </section>
+                        <section class="p-6 border-b bg-gray-50">
+                            <h2 class="text-xl font-semibold mb-4 text-gray-600">Hoofdgegevens (informatief)</h2>
+                            <!-- Alleen-lezen hoofdgegevens -->
+                        </section>
+                        <footer class="bg-gray-50 p-4 flex justify-end items-center gap-4">
+                            <button class="text-sm font-medium text-red-600 hover:text-red-900">Taak Terugsturen</button>
+                            <button class="btn-back-to-dashboard bg-primary hover:bg-primary-dark text-white font-bold py-2 px-5 rounded-lg shadow-sm">Taak Afronden</button>
+                        </footer>
+                    </div>
+                </main>
+            </div>
+        </div>
 
-            <!-- Kolom 1: Jouw openstaande taken -->
-            <section class="flex flex-col">
-                <h2 class="text-lg font-semibold mb-4 pb-2 border-b-2 border-accent">
-                    <span class="bg-accent text-white rounded-full w-6 h-6 inline-flex items-center justify-center mr-2">2</span>
-                    Mijn Openstaande Taken
-                </h2>
-                <div class="space-y-4 overflow-y-auto">
-                    <!-- Voorbeeld Taakkaart 1 -->
-                    <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-accent transition-transform hover:scale-105">
-                        <div class="flex justify-between items-start">
-                            <h3 class="font-bold text-primary">Verantwoording #1024</h3>
-                            <span class="text-xs font-semibold bg-yellow-200 text-yellow-800 px-2 py-1 rounded-full">In behandeling</span>
-                        </div>
-                        <p class="text-sm text-gray-600 mt-1">Totaalbedrag: € 150.000,00</p>
-                        <div class="mt-4">
-                            <p class="text-xs font-medium">Jouw taak:</p>
-                            <p class="text-sm font-semibold">Verantwoording 'Medische kosten' (€ 60.000) invullen</p>
-                        </div>
-                        <div class="mt-3 text-xs text-gray-500">
-                            <span>Aangemaakt door: Jan de Vries</span>
-                        </div>
-                    </div>
-
-                    <!-- Voorbeeld Taakkaart 2 -->
-                    <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-accent transition-transform hover:scale-105">
-                        <h3 class="font-bold text-primary">Verantwoording #1022</h3>
-                        <p class="text-sm text-gray-600 mt-1">Totaalbedrag: € 5.250,00</p>
-                        <div class="mt-4">
-                            <p class="text-xs font-medium">Jouw taak:</p>
-                            <p class="text-sm font-semibold">Verantwoording 'Reiskosten' (€ 250) goedkeuren</p>
-                        </div>
-                        <div class="mt-3 text-xs text-gray-500">
-                            <span>Aangemaakt door: Fatima El Moussaoui</span>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Kolom 2: Wachtend op anderen / Alle openstaande -->
-            <section class="flex flex-col">
-                <h2 class="text-lg font-semibold mb-4 pb-2 border-b-2 border-gray-300">
-                    <span class="bg-gray-500 text-white rounded-full w-6 h-6 inline-flex items-center justify-center mr-2">3</span>
-                    Wachtend op Anderen / Alle Openstaande
-                </h2>
-                <div class="space-y-4 overflow-y-auto">
-                    <!-- Voorbeeld Taakkaart 3 -->
-                    <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-gray-300">
-                        <div class="flex justify-between items-start">
-                            <h3 class="font-bold text-gray-700">Verantwoording #1025</h3>
-                            <span class="text-xs font-semibold bg-blue-200 text-blue-800 px-2 py-1 rounded-full">Nieuw</span>
-                        </div>
-                        <p class="text-sm text-gray-600 mt-1">Totaalbedrag: € 12.000,00</p>
-                        <div class="mt-4">
-                            <p class="text-xs font-medium">Huidige status:</p>
-                            <p class="text-sm">Wacht op <span class="font-semibold">Piet Jansen</span> (Zaakschade)</p>
-                        </div>
-                    </div>
-
-                    <!-- Voorbeeld Taakkaart 4 (van #1024) -->
-                    <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-gray-300 opacity-70">
-                        <h3 class="font-bold text-gray-700">Verantwoording #1024</h3>
-                        <p class="text-sm text-gray-600 mt-1">Totaalbedrag: € 150.000,00</p>
-                        <div class="mt-4">
-                            <p class="text-xs font-medium">Huidige status:</p>
-                            <p class="text-sm">Wacht op <span class="font-semibold">[Jouw Naam]</span> (Medische kosten)</p>
-                            <p class="text-sm mt-1">Wacht op <span class="font-semibold">Anna de Wit</span> (Verlies verdienvermogen)</p>
-                        </div>
-                    </div>
-                    
-                    <!-- Voorbeeld Taakkaart 5 -->
-                    <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-gray-300">
-                        <h3 class="font-bold text-gray-700">Verantwoording #1023</h3>
-                        <p class="text-sm text-gray-600 mt-1">Totaalbedrag: € 850,00</p>
-                        <div class="mt-4">
-                            <p class="text-xs font-medium">Huidige status:</p>
-                            <p class="text-sm">Wacht op <span class="font-semibold">Kees de Boer</span> (Huishoudelijke hulp)</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Kolom 3: Recente Activiteit & Notificaties -->
-            <section class="flex flex-col">
-                <h2 class="text-lg font-semibold mb-4 pb-2 border-b-2 border-gray-300">Recente Activiteit</h2>
-                <div class="space-y-3 overflow-y-auto">
-                    <!-- Voorbeeld Activiteit 1 -->
-                    <div class="text-sm p-3 bg-gray-100 rounded-md">
-                        <p><span class="font-semibold">Fatima El Moussaoui</span> heeft formulier <span class="font-semibold">#1025</span> aangemaakt.</p>
-                        <p class="text-xs text-gray-500">2 minuten geleden</p>
-                    </div>
-                    <!-- Voorbeeld Activiteit 2 -->
-                    <div class="text-sm p-3 bg-gray-100 rounded-md">
-                        <p><span class="font-semibold">Jij</span> hebt de taak 'Reiskosten' voor formulier <span class="font-semibold">#1021</span> afgerond.</p>
-                        <p class="text-xs text-gray-500">1 uur geleden</p>
-                    </div>
-                    <!-- Voorbeeld Activiteit 3 -->
-                    <div class="text-sm p-3 bg-gray-100 rounded-md">
-                        <p>Formulier <span class="font-semibold">#1019</span> is volledig afgerond.</p>
-                        <p class="text-xs text-gray-500">3 uur geleden</p>
-                    </div>
-                </div>
-            </section>
-
-        </main>
-
+        <!-- MODAL: DEELTAAK TOEVOEGEN (standaard verborgen) -->
+        <div id="add-task-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg">
+                <header class="p-4 border-b">
+                    <h2 class="text-xl font-semibold text-primary">Deeltaak Toevoegen</h2>
+                </header>
+                <main class="p-6 space-y-4">
+                    <!-- Formuliervelden uit vorige stap -->
+                </main>
+                <footer class="bg-gray-50 p-4 flex justify-end items-center gap-4 rounded-b-lg">
+                    <button id="btn-close-modal" class="text-sm font-medium text-gray-600 hover:text-gray-900">Annuleren</button>
+                    <button id="btn-add-task-and-close-modal" class="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-5 rounded-lg shadow-sm">Taak Toevoegen</button>
+                </footer>
+            </div>
+        </div>
     </div>
 
+    <!-- HET SCRIPT DAT ALLES LAAT WERKEN -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Alle pagina's en de modal
+            const dashboardPage = document.getElementById('dashboard-page');
+            const newFormPage = document.getElementById('new-form-page');
+            const taskViewPage = document.getElementById('task-view-page');
+            const addTaskModal = document.getElementById('add-task-modal');
+
+            // Functie om van pagina te wisselen
+            const showPage = (pageToShow) => {
+                dashboardPage.classList.add('hidden');
+                newFormPage.classList.add('hidden');
+                taskViewPage.classList.add('hidden');
+                pageToShow.classList.remove('hidden');
+            };
+
+            // --- Event Listeners voor navigatie ---
+
+            // Van Dashboard naar Nieuw Formulier
+            document.getElementById('btn-go-to-new-form').addEventListener('click', () => {
+                showPage(newFormPage);
+            });
+
+            // Van Dashboard naar Taak Uitvoeren (voor alle taakkaarten)
+            document.querySelectorAll('.task-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    showPage(taskViewPage);
+                });
+            });
+
+            // Terug naar Dashboard (voor alle 'terug' knoppen)
+            document.querySelectorAll('.btn-back-to-dashboard').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    e.preventDefault(); // Voorkom dat de link de pagina herlaadt
+                    showPage(dashboardPage);
+                });
+            });
+
+            // --- Event Listeners voor de Modal ---
+
+            // Open de modal
+            document.getElementById('btn-open-modal').addEventListener('click', () => {
+                addTaskModal.classList.remove('hidden');
+            });
+
+            // Sluit de modal (Annuleren knop)
+            document.getElementById('btn-close-modal').addEventListener('click', () => {
+                addTaskModal.classList.add('hidden');
+            });
+            
+            // Voeg taak toe en sluit de modal
+            document.getElementById('btn-add-task-and-close-modal').addEventListener('click', () => {
+                // Hier zou de logica komen om de taak op te slaan
+                alert('Taak is (fictief) toegevoegd!');
+                addTaskModal.classList.add('hidden');
+            });
+        });
+    </script>
 </body>
 </html>
