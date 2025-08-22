@@ -52,10 +52,11 @@
                     </div>
                     <div class="flex items-center gap-4"><span id="user-welcome" class="text-sm font-medium">Welkom...</span><button id="btn-go-to-new-form" class="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-lg shadow-sm"> + Nieuw Formulier </button></div>
                 </header>
-                <main class="flex-grow p-4 md:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-y-auto">
+                <main class="flex-grow p-4 md:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-4 gap-6 overflow-y-auto">
                     <section class="flex flex-col"><h2 class="text-lg font-semibold mb-4 pb-2 border-b-2 border-accent">Mijn Openstaande Taken</h2><div id="my-tasks-container" class="space-y-4 overflow-y-auto"><p class="text-sm text-gray-500">Taken worden geladen...</p></div></section>
                     <section class="flex flex-col"><h2 class="text-lg font-semibold mb-4 pb-2 border-b-2 border-gray-300">Wachtend op Anderen</h2><div id="other-tasks-container" class="space-y-4 overflow-y-auto"><p class="text-sm text-gray-500">Taken worden geladen...</p></div></section>
-                    <section class="flex flex-col"><h2 class="text-lg font-semibold mb-4 pb-2 border-b-2 border-gray-300">Recente Activiteit</h2><div id="activity-feed-container" class="space-y-3 overflow-y-auto"><p class="text-sm text-gray-500">Nog geen activiteit.</p></div></section>
+                    <section class="flex flex-col"><h2 class="text-lg font-semibold mb-4 pb-2 border-b-2 border-gray-300">Recent Afgerond</h2><div id="activity-feed-container" class="space-y-3 overflow-y-auto"><p class="text-sm text-gray-500">Nog geen activiteit.</p></div></section>
+                    <section class="flex flex-col"><h2 class="text-lg font-semibold mb-4 pb-2 border-b-2 border-yellow-500">Ingekomen Verzoeken</h2><div id="requests-container" class="space-y-3 overflow-y-auto"><p class="text-sm text-gray-500">Geen verzoeken.</p></div></section>
                 </main>
             </div>
         </div>
@@ -218,6 +219,21 @@
                 </footer>
             </div>
         </div>
+        
+        <!-- MODAL: DATUM BEVESTIGEN -->
+        <div id="date-confirm-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center p-4 z-50">
+             <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg">
+                <header class="p-4 border-b"><h2 class="text-xl font-semibold text-primary">Datum Correct?</h2></header>
+                <main class="p-6 space-y-4">
+                    <p class="text-sm text-gray-600">De transactiedatum staat ingesteld op:</p>
+                    <input type="date" id="confirm-date-input" class="block w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
+                </main>
+                <footer class="bg-gray-50 p-4 flex justify-end items-center gap-4 rounded-b-lg">
+                    <button type="button" id="btn-cancel-date-confirm" class="text-sm font-medium text-gray-600 hover:text-gray-900">Annuleren</button>
+                    <button type="button" id="btn-confirm-date" class="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-5 rounded-lg shadow-sm">Bevestigen en Opslaan</button>
+                </footer>
+            </div>
+        </div>
     </div>
     
     <div id="notification" class="hidden"></div>
@@ -226,11 +242,13 @@
     <script type="module">
         // --- LOKALE DATABASE & STAAT ---
         let database = []; // Ons lokale geheugen voor formulieren
+        let editRequests = []; // Geheugen voor wijzigingsverzoeken
         let currentUserId = 'test-user-id';
         let currentUserDisplayName = 'Test Gebruiker';
         let deeltakenBuffer = []; // Tijdelijke opslag voor deeltaken in het formulier
         let activeTask = null; // Houdt bij welke taak we nu bekijken
         let activityLog = []; // Logboek voor recente acties
+        let lastUsedDate = new Date().toISOString().split('T')[0]; // Onthoudt de laatst gebruikte datum
 
         // --- INITIALISATIE ---
         document.addEventListener('DOMContentLoaded', () => {
@@ -244,9 +262,11 @@
             const myTasksContainer = document.getElementById('my-tasks-container');
             const otherTasksContainer = document.getElementById('other-tasks-container');
             const activityContainer = document.getElementById('activity-feed-container');
+            const requestsContainer = document.getElementById('requests-container');
             myTasksContainer.innerHTML = '';
             otherTasksContainer.innerHTML = '';
             activityContainer.innerHTML = '';
+            requestsContainer.innerHTML = '';
 
             const allTasks = database.flatMap(form => 
                 form.deeltaken.map(taak => ({ ...taak, formId: form.id, formOmschrijving: form.omschrijving, aangemaaktDoor: form.aangemaaktDoor, totaalbedrag: form.totaalbedrag, transactiedatum: form.transactiedatum }))
@@ -254,15 +274,20 @@
 
             const myOpenTasks = allTasks.filter(taak => taak.collega === currentUserDisplayName && taak.status === 'open');
             const otherOpenTasks = allTasks.filter(taak => taak.collega !== currentUserDisplayName && taak.status === 'open');
-            
+            const completedTasks = allTasks.filter(taak => taak.status === 'completed');
+            const myRequests = editRequests.filter(req => req.initiator === currentUserDisplayName);
+
             if (myOpenTasks.length === 0) myTasksContainer.innerHTML = '<p class="text-sm text-gray-500">Je hebt geen openstaande taken.</p>';
             myOpenTasks.forEach(taak => myTasksContainer.innerHTML += createTaskCard(taak, true));
 
             if (otherOpenTasks.length === 0) otherTasksContainer.innerHTML = '<p class="text-sm text-gray-500">Er zijn geen andere openstaande taken.</p>';
             otherOpenTasks.forEach(taak => otherTasksContainer.innerHTML += createTaskCard(taak, false));
             
-            if (activityLog.length === 0) activityContainer.innerHTML = '<p class="text-sm text-gray-500">Nog geen activiteit.</p>';
-            [...activityLog].reverse().slice(0, 5).forEach(log => activityContainer.innerHTML += createActivityItem(log));
+            if (completedTasks.length === 0) activityContainer.innerHTML = '<p class="text-sm text-gray-500">Nog geen voltooide taken.</p>';
+            [...completedTasks].reverse().forEach(taak => activityContainer.innerHTML += createActivityItem(taak, true));
+
+            if (myRequests.length === 0) requestsContainer.innerHTML = '<p class="text-sm text-gray-500">Geen verzoeken.</p>';
+            myRequests.forEach(req => requestsContainer.innerHTML += createRequestItem(req));
         }
 
         function createTaskCard(taak, isMine) {
@@ -277,8 +302,20 @@
                 </div>`;
         }
 
-        function createActivityItem(log) {
-            return `<div class="text-sm p-3 bg-gray-100 rounded-md"><p>${log}</p></div>`;
+        function createActivityItem(taak, isClickable) {
+            const identifier = taak.formOmschrijving || `formulier van €${taak.totaalbedrag.toFixed(2)}`;
+            const cursorClass = isClickable ? 'cursor-pointer hover:bg-gray-200' : '';
+            return `<div class="text-sm p-3 bg-gray-100 rounded-md ${cursorClass} completed-task-item" data-form-id="${taak.formId}" data-taak-id="${taak.id}"><p><span class="font-semibold">${taak.collega}</span> heeft '${identifier}' afgerond.</p></div>`;
+        }
+
+        function createRequestItem(req) {
+            return `<div class="text-sm p-3 bg-yellow-100 rounded-md">
+                <p><span class="font-semibold">${req.requester}</span> wil taak '${req.taakblok}' aanpassen.</p>
+                <div class="mt-2 flex gap-2">
+                    <button data-request-id="${req.id}" class="btn-approve-request text-xs bg-green-500 text-white px-2 py-1 rounded">Goedkeuren</button>
+                    <button data-request-id="${req.id}" class="btn-reject-request text-xs bg-red-500 text-white px-2 py-1 rounded">Afwijzen</button>
+                </div>
+            </div>`;
         }
         
         function renderDeeltaken() {
@@ -312,24 +349,24 @@
             document.getElementById('task-view-subtitle').textContent = `Aangemaakt door: ${form.aangemaaktDoor}`;
             
             const header = document.getElementById('task-view-header');
-            header.innerHTML = `<h2 class="text-2xl font-bold">Jouw Taak: ${taak.taakblok || 'Algemene Verantwoording'}</h2><p class="mt-1">Voeg de benodigde documenten en een toelichting toe voor het bedrag van <strong>€ ${taak.bedrag.toFixed(2)}</strong>.</p>`;
+            header.innerHTML = `<h2 class="text-2xl font-bold">Taak: ${taak.taakblok || 'Algemene Verantwoording'}</h2><p class="mt-1">Bedrag: <strong>€ ${taak.bedrag.toFixed(2)}</strong>.</p>`;
 
             const mainData = document.getElementById('task-view-main-data');
             mainData.innerHTML = `<div><label class="block text-sm font-medium text-gray-700">Totaalbedrag formulier</label><input type="text" value="€ ${form.totaalbedrag.toFixed(2)}" class="mt-1 block w-full rounded-md readonly-input" readonly></div><div><label class="block text-sm font-medium text-gray-700">Datum van transactie</label><input type="text" value="${form.transactiedatum}" class="mt-1 block w-full rounded-md readonly-input" readonly></div>`;
 
-            // Permission check en knoppen renderen
             const footer = document.getElementById('task-view-footer');
             const permissionBanner = document.getElementById('permission-denied-banner');
-            if (taak.collega === currentUserDisplayName) {
-                footer.innerHTML = `
-                    <button id="btn-return-task" class="text-sm font-medium text-red-600 hover:text-red-900">Taak Terugsturen</button>
-                    <button id="btn-complete-task" class="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-5 rounded-lg shadow-sm">Taak Afronden</button>
-                `;
-                permissionBanner.classList.add('hidden');
+            permissionBanner.classList.add('hidden');
+
+            if (taak.status === 'completed') {
+                footer.innerHTML = `<button id="btn-request-edit" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-5 rounded-lg shadow-sm">Wijziging Aanvragen</button>`;
+                if (form.aangemaaktDoor === currentUserDisplayName) {
+                    footer.innerHTML += `<button id="btn-reopen-task" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-5 rounded-lg shadow-sm">Taak Heropenen</button>`;
+                }
+            } else if (taak.collega === currentUserDisplayName) {
+                footer.innerHTML = `<button id="btn-return-task" class="text-sm font-medium text-red-600 hover:text-red-900">Taak Terugsturen</button><button id="btn-complete-task" class="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-5 rounded-lg shadow-sm">Taak Afronden</button>`;
             } else {
-                footer.innerHTML = `
-                    <button id="btn-take-over-task" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-5 rounded-lg shadow-sm">Taak Overnemen</button>
-                `;
+                footer.innerHTML = `<button id="btn-take-over-task" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-5 rounded-lg shadow-sm">Taak Overnemen</button>`;
                 permissionBanner.textContent = `Deze taak is toegewezen aan ${taak.collega}.`;
                 permissionBanner.classList.remove('hidden');
             }
@@ -350,14 +387,14 @@
             deeltakenBuffer.push({ id: `taak_${Date.now()}_${Math.random()}`, collega, taakblok, bedrag: parseFloat(bedrag), status: 'open' });
             renderDeeltaken();
             updateAmountValidation();
-            closeModal();
+            closeModal(modals.addTask);
         }
 
-        function saveNewForm(singleAssignee = null) {
+        function saveNewForm(confirmedDate, singleAssignee = null) {
             const form = {
                 id: `form_${Date.now()}`,
                 totaalbedrag: parseFloat(document.getElementById('totaalbedrag').value) || 0,
-                transactiedatum: document.getElementById('transactiedatum').value,
+                transactiedatum: confirmedDate,
                 omschrijving: document.getElementById('omschrijving').value,
                 aangemaaktDoor: currentUserDisplayName,
                 deeltaken: deeltakenBuffer
@@ -367,13 +404,15 @@
                 showNotification('Vul het totaalbedrag en de transactiedatum in.', 'error');
                 return;
             }
+            
+            lastUsedDate = confirmedDate;
 
             if (deeltakenBuffer.length === 0) {
                 if (singleAssignee) {
                     deeltakenBuffer.push({ id: `taak_${Date.now()}`, collega: singleAssignee, taakblok: 'Volledige Verantwoording', bedrag: form.totaalbedrag, status: 'open' });
                     form.deeltaken = deeltakenBuffer;
                 } else {
-                    openSingleAssignModal();
+                    openModal(modals.singleAssign);
                     return;
                 }
             }
@@ -381,7 +420,7 @@
             const deeltakenTotaal = deeltakenBuffer.reduce((sum, taak) => sum + taak.bedrag, 0);
             if (deeltakenTotaal !== form.totaalbedrag) {
                 const verschil = form.totaalbedrag - deeltakenTotaal;
-                showNotification(`Deeltaken-totaal (€${deeltakenTotaal.toFixed(2)}) komt niet overeen met het hoofdbedrag. Verschil: €${verschil.toFixed(2)}. Voeg een rest-taak toe.`, 'error');
+                showNotification(`Deeltaken-totaal (€${deeltakenTotaal.toFixed(2)}) komt niet overeen. Verschil: €${verschil.toFixed(2)}.`, 'error');
                 return;
             }
 
@@ -427,6 +466,47 @@
             }
         }
         
+        function requestEdit() {
+            if (!activeTask) return;
+            const { form, taak } = findTask(activeTask.formId, activeTask.taakId);
+            if (form && taak) {
+                const newRequest = {
+                    id: `req_${Date.now()}`,
+                    requester: currentUserDisplayName,
+                    initiator: form.aangemaaktDoor,
+                    formId: form.id,
+                    taakId: taak.id,
+                    taakblok: taak.taakblok
+                };
+                editRequests.push(newRequest);
+                logActivity(`<span class="font-semibold">${currentUserDisplayName}</span> heeft een wijziging aangevraagd voor taak '${taak.taakblok}'.`);
+                showNotification('Wijzigingsverzoek verzonden!', 'info');
+                resetAndShowPage(pages.dashboard);
+            }
+        }
+        function approveRequest(requestId) {
+            const requestIndex = editRequests.findIndex(r => r.id === requestId);
+            if (requestIndex === -1) return;
+            const request = editRequests[requestIndex];
+            const { taak } = findTask(request.formId, request.taakId);
+            if (taak) {
+                taak.status = 'open';
+                taak.collega = request.requester; // Wijs opnieuw toe aan de aanvrager
+                logActivity(`Verzoek van <span class="font-semibold">${request.requester}</span> is goedgekeurd.`);
+                editRequests.splice(requestIndex, 1); // Verwijder verzoek
+                renderDashboard();
+            }
+        }
+        function rejectRequest(requestId) {
+            const requestIndex = editRequests.findIndex(r => r.id === requestId);
+            if (requestIndex > -1) {
+                const request = editRequests[requestIndex];
+                logActivity(`Verzoek van <span class="font-semibold">${request.requester}</span> is afgewezen.`);
+                editRequests.splice(requestIndex, 1); // Verwijder verzoek
+                renderDashboard();
+            }
+        }
+        
         function resetNewForm() {
             document.getElementById('new-form-element').reset();
             deeltakenBuffer = [];
@@ -435,6 +515,7 @@
         
         function updateAmountValidation() {
             const display = document.getElementById('amount-validation-display');
+            if(!display) return;
             const totaal = parseFloat(document.getElementById('totaalbedrag').value) || 0;
             const deeltakenTotaal = deeltakenBuffer.reduce((sum, taak) => sum + taak.bedrag, 0);
             const verschil = totaal - deeltakenTotaal;
@@ -472,8 +553,11 @@
             newForm: document.getElementById('new-form-page'),
             taskView: document.getElementById('task-view-page')
         };
-        const modal = document.getElementById('add-task-modal');
-        const singleAssignModal = document.getElementById('assign-single-task-modal');
+        const modals = {
+            addTask: document.getElementById('add-task-modal'),
+            singleAssign: document.getElementById('assign-single-task-modal'),
+            dateConfirm: document.getElementById('date-confirm-modal')
+        };
 
         function showPage(pageToShow) {
             Object.values(pages).forEach(p => p.classList.add('hidden'));
@@ -486,36 +570,52 @@
             showPage(pageToShow);
         }
 
-        const openModal = () => modal.classList.remove('hidden');
-        const closeModal = () => {
-            document.querySelectorAll('#modal-taakblok-container input[type="checkbox"]').forEach(cb => cb.checked = false);
+        const openModal = (modal) => modal.classList.remove('hidden');
+        const closeModal = (modal) => {
+            if (modal === modals.addTask) {
+                document.querySelectorAll('#modal-taakblok-container input[type="checkbox"]').forEach(cb => cb.checked = false);
+            }
             modal.classList.add('hidden');
         }
-        const openSingleAssignModal = () => singleAssignModal.classList.remove('hidden');
-        const closeSingleAssignModal = () => singleAssignModal.classList.add('hidden');
 
         // --- EVENT LISTENERS ---
         function setupEventListeners() {
             document.body.addEventListener('click', function(e) {
                 const target = e.target;
                 
-                if (target.id === 'btn-go-to-new-form') showPage(pages.newForm);
+                if (target.id === 'btn-go-to-new-form') {
+                    document.getElementById('transactiedatum').value = lastUsedDate;
+                    showPage(pages.newForm);
+                }
                 if (target.closest('.btn-back-to-dashboard')) { e.preventDefault(); resetAndShowPage(pages.dashboard); }
-                if (target.id === 'btn-save-form') saveNewForm();
+                if (target.id === 'btn-save-form') {
+                    document.getElementById('confirm-date-input').value = document.getElementById('transactiedatum').value;
+                    openModal(modals.dateConfirm);
+                }
+                if (target.id === 'btn-confirm-date') {
+                    const confirmedDate = document.getElementById('confirm-date-input').value;
+                    saveNewForm(confirmedDate);
+                    closeModal(modals.dateConfirm);
+                }
+                if (target.id === 'btn-cancel-date-confirm') closeModal(modals.dateConfirm);
                 if (target.id === 'btn-complete-task') completeActiveTask();
                 if (target.id === 'btn-return-task') returnActiveTask();
                 if (target.id === 'btn-take-over-task') takeOverActiveTask();
-                if (target.id === 'btn-open-modal') openModal();
-                if (target.id === 'btn-close-modal') closeModal();
+                if (target.id === 'btn-request-edit') requestEdit();
+                if (target.id === 'btn-open-modal') openModal(modals.addTask);
+                if (target.id === 'btn-close-modal') closeModal(modals.addTask);
                 if (target.id === 'btn-add-task') addDeeltaak();
-                if (target.id === 'btn-close-single-assign-modal') closeSingleAssignModal();
+                if (target.id === 'btn-close-single-assign-modal') closeModal(modals.singleAssign);
                 if (target.id === 'btn-assign-single-task') {
                     const assignee = document.getElementById('single-assign-collega').value;
-                    saveNewForm(assignee);
-                    closeSingleAssignModal();
+                    saveNewForm(lastUsedDate, assignee); // Pass date as well
+                    closeModal(modals.singleAssign);
                 }
 
-                const taskCard = target.closest('.task-card');
+                if (target.closest('.btn-approve-request')) approveRequest(target.closest('.btn-approve-request').dataset.requestId);
+                if (target.closest('.btn-reject-request')) rejectRequest(target.closest('.btn-reject-request').dataset.requestId);
+
+                const taskCard = target.closest('.task-card, .completed-task-item');
                 if (taskCard) {
                     const { form, taak } = findTask(taskCard.dataset.formId, taskCard.dataset.taakId);
                     if (form && taak) {
