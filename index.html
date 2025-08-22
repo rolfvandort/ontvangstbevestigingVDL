@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Derdengeld Verantwoording App</title>
+    <title>Werkende App - Verantwoordingen</title>
     <!-- Tailwind CSS voor snelle styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Font 'Inter' zoals in je voorbeeld -->
@@ -42,11 +42,6 @@
     <!-- Dit is de container voor de hele applicatie -->
     <div id="app-container">
 
-        <!-- Banner voor offline modus -->
-        <div id="offline-banner" class="hidden bg-yellow-500 text-white text-center p-2 font-semibold">
-            Let op: App draait in offline demo-modus. Gegevens worden niet permanent opgeslagen.
-        </div>
-
         <!-- PAGINA 1: DASHBOARD -->
         <div id="dashboard-page">
             <div class="flex flex-col h-screen">
@@ -68,7 +63,7 @@
 
         <!-- PAGINA 2: NIEUW FORMULIER (standaard verborgen) -->
         <div id="new-form-page" class="hidden">
-             <div class="flex flex-col min-h-screen">
+            <div class="flex flex-col min-h-screen">
                 <header class="bg-white shadow-md w-full p-4 flex justify-between items-center z-10">
                     <div><h1 class="text-2xl font-bold text-primary">Nieuwe Verantwoording Starten</h1><p class="text-sm text-gray-500">Vul de basisgegevens in en wijs deeltaken toe.</p></div>
                     <a href="#" class="btn-back-to-dashboard text-sm font-medium text-gray-600 hover:text-primary">&larr; Terug naar Dashboard</a>
@@ -269,33 +264,22 @@
 
     <!-- HET SCRIPT DAT DE APP LAAT WERKEN -->
     <script type="module">
-        // --- GLOBALE STAAT & CONFIGURATIE ---
+        // --- LOKALE DATABASE & STAAT ---
+        let database = []; // Ons lokale geheugen voor formulieren
+        let editRequests = []; // Geheugen voor wijzigingsverzoeken
         let currentUserId = 'test-user-id';
         let currentUserDisplayName = 'Test Gebruiker';
-        let deeltakenBuffer = [];
-        let activeTask = null;
-        let lastUsedDate = new Date().toISOString().split('T')[0];
-        
-        // Lokale data voor offline modus
-        let localDatabase = {
-            forms: [],
-            editRequests: [],
-            activityLog: []
-        };
+        let deeltakenBuffer = []; // Tijdelijke opslag voor deeltaken in het formulier
+        let activeTask = null; // Houdt bij welke taak we nu bekijken
+        let activityLog = []; // Logboek voor recente acties
+        let lastUsedDate = new Date().toISOString().split('T')[0]; // Onthoudt de laatst gebruikte datum
 
         // --- INITIALISATIE ---
         document.addEventListener('DOMContentLoaded', () => {
-            // In de finale versie wordt dit vervangen door de echte Firebase initialisatie.
-            // Voor nu starten we direct in de offline modus.
-            runInOfflineMode();
-            setupEventListeners();
-        });
-        
-        function runInOfflineMode() {
-            document.getElementById('offline-banner').classList.remove('hidden');
             document.getElementById('user-welcome').textContent = `Welkom, ${currentUserDisplayName}`;
             renderDashboard();
-        }
+            setupEventListeners();
+        });
 
         // --- RENDER FUNCTIES ---
         function renderDashboard() {
@@ -311,7 +295,7 @@
             activityContainer.innerHTML = '';
             requestsContainer.innerHTML = '';
 
-            const allTasks = localDatabase.forms.flatMap(form => 
+            const allTasks = database.flatMap(form => 
                 form.deeltaken.map(taak => ({ ...taak, formId: form.id, formOmschrijving: form.omschrijving, aangemaaktDoor: form.aangemaaktDoor, totaalbedrag: form.totaalbedrag, transactiedatum: form.transactiedatum }))
             );
 
@@ -324,13 +308,13 @@
             if (otherOpenTasks.length === 0) otherTasksContainer.innerHTML = '<p class="text-sm text-gray-500">Er zijn geen andere openstaande taken.</p>';
             otherOpenTasks.forEach(taak => otherTasksContainer.innerHTML += createTaskCard(taak, false));
             
-            if (localDatabase.activityLog.length === 0) activityContainer.innerHTML = '<p class="text-sm text-gray-500">Nog geen activiteit.</p>';
-            [...localDatabase.activityLog].reverse().slice(0, 10).forEach(log => {
+            if (activityLog.length === 0) activityContainer.innerHTML = '<p class="text-sm text-gray-500">Nog geen activiteit.</p>';
+            [...activityLog].reverse().slice(0, 10).forEach(log => {
                 const isClickable = log.type === 'completed' || log.type === 'reopened';
                 activityContainer.innerHTML += createActivityItem(log, isClickable);
             });
 
-            const myRequests = localDatabase.editRequests.filter(req => req.initiator === currentUserDisplayName);
+            const myRequests = editRequests.filter(req => req.initiator === currentUserDisplayName);
             if (myRequests.length === 0) {
                 requestsSection.classList.add('hidden');
                 dashboardGrid.classList.remove('lg:grid-cols-4');
@@ -479,7 +463,7 @@
                 return;
             }
 
-            localDatabase.forms.push(form);
+            database.push(form);
             logEvent(form.id, null, `<span class="font-semibold">${currentUserDisplayName}</span> heeft een nieuw formulier aangemaakt.`);
             showNotification('Formulier succesvol aangemaakt!', 'success');
             resetAndShowPage(pages.dashboard);
@@ -543,31 +527,31 @@
                     taakId: taak.id,
                     taakblok: taak.taakblok
                 };
-                localDatabase.editRequests.push(newRequest);
+                editRequests.push(newRequest);
                 logEvent(form.id, taak.id, `<span class="font-semibold">${currentUserDisplayName}</span> heeft een wijziging aangevraagd voor taak '${taak.taakblok}'.`, 'generic');
                 showNotification('Wijzigingsverzoek verzonden!', 'info');
                 resetAndShowPage(pages.dashboard);
             }
         }
         function approveRequest(requestId) {
-            const requestIndex = localDatabase.editRequests.findIndex(r => r.id === requestId);
+            const requestIndex = editRequests.findIndex(r => r.id === requestId);
             if (requestIndex === -1) return;
-            const request = localDatabase.editRequests[requestIndex];
+            const request = editRequests[requestIndex];
             const { form, taak } = findTask(request.formId, request.taakId);
             if (taak) {
                 taak.status = 'open';
                 taak.collega = request.requester; // Wijs opnieuw toe aan de aanvrager
                 logEvent(form.id, taak.id, `Verzoek van <span class="font-semibold">${request.requester}</span> is goedgekeurd. Taak heropend.`, 'reopened');
-                localDatabase.editRequests.splice(requestIndex, 1); // Verwijder verzoek
+                editRequests.splice(requestIndex, 1); // Verwijder verzoek
                 renderDashboard();
             }
         }
         function rejectRequest(requestId) {
-            const requestIndex = localDatabase.editRequests.findIndex(r => r.id === requestId);
+            const requestIndex = editRequests.findIndex(r => r.id === requestId);
             if (requestIndex > -1) {
-                const request = localDatabase.editRequests[requestIndex];
+                const request = editRequests[requestIndex];
                 logEvent(request.formId, request.taakId, `Verzoek van <span class="font-semibold">${request.requester}</span> is afgewezen.`, 'generic');
-                localDatabase.editRequests.splice(requestIndex, 1); // Verwijder verzoek
+                editRequests.splice(requestIndex, 1); // Verwijder verzoek
                 renderDashboard();
             }
         }
@@ -593,15 +577,15 @@
         }
         
         function logEvent(formId, taakId, message, type = 'generic') {
-            const form = localDatabase.forms.find(f => f.id === formId);
+            const form = database.find(f => f.id === formId);
             if (form) {
                 form.history.push(message);
             }
-            localDatabase.activityLog.push({ message, formId, taakId, type });
+            activityLog.push({ message, formId, taakId, type });
         }
 
         function findTask(formId, taakId) {
-            const form = localDatabase.forms.find(f => f.id === formId);
+            const form = database.find(f => f.id === formId);
             const taak = form ? form.deeltaken.find(t => t.id === taakId) : undefined;
             return { form, taak };
         }
@@ -718,6 +702,11 @@
             if(totaalbedragInput) {
                 totaalbedragInput.addEventListener('input', updateAmountValidation);
             }
+        }
+        
+        function loadTemplates() {
+            // In een echte app zouden we de HTML voor de pagina's en modals hier laden,
+            // maar voor dit prototype staan ze al in de body.
         }
     </script>
 </body>
