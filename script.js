@@ -86,7 +86,11 @@ document.addEventListener('DOMContentLoaded', () => {
         wettenbankFilterToggleIcon: document.getElementById('wettenbankFilterToggleIcon'),
         wettenbankFacets: document.getElementById('wettenbankFacets'),
         wettenbankPagination: document.getElementById('wettenbankPagination'),
-        documentViewer: document.getElementById('documentViewer')
+        documentViewer: document.getElementById('documentViewer'),
+        keywordModal: document.getElementById('keywordModal'),
+        closeKeywordModal: document.getElementById('closeKeywordModal'),
+        keywordOptions: document.getElementById('keywordOptions'),
+        searchWithKeywordsButton: document.getElementById('searchWithKeywordsButton')
     };
 
     // --- GLOBALE STATE ---
@@ -130,10 +134,6 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.quickSearchButton.addEventListener('click', handleJurisprudenceSearch);
         elements.quickSearchInput.addEventListener('keypress', e => { if (e.key === 'Enter') handleJurisprudenceSearch(); });
         elements.periodPreset.addEventListener('change', handlePeriodPresetChange);
-        elements.dateFrom.addEventListener('change', validateDateRange);
-        elements.dateTo.addEventListener('change', validateDateRange);
-        elements.modifiedFrom.addEventListener('change', validateModifiedDateRange);
-        elements.modifiedTo.addEventListener('change', validateModifiedDateRange);
         elements.creator.addEventListener('input', () => handleAutocompleteDebounced(elements.creator, elements.creatorSuggestions, instanties));
         elements.clearCreator.addEventListener('click', clearCreatorInput);
         elements.apiSearchButton.addEventListener('click', handleJurisprudenceSearch);
@@ -152,6 +152,14 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.jurisprudencePagination.addEventListener('change', handlePageInputChange);
         elements.wettenbankPagination.addEventListener('click', handlePaginationClick);
         elements.wettenbankPagination.addEventListener('change', handlePageInputChange);
+        
+        elements.closeKeywordModal.addEventListener('click', hideKeywordModal);
+        elements.searchWithKeywordsButton.addEventListener('click', searchWithSelectedKeywords);
+        elements.keywordModal.addEventListener('click', (e) => {
+            if (e.target.id === 'keywordModal') { // Close modal if clicking on the background
+                hideKeywordModal();
+            }
+        });
 
         document.addEventListener('click', (e) => { if (!e.target.closest('.autocomplete-container')) { elements.creatorSuggestions.innerHTML = ''; } });
     };
@@ -163,9 +171,8 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.showFiltersButton.innerHTML = `<span id="filterToggleIcon">${isFiltersVisible ? '▲' : '▼'}</span> ${isFiltersVisible ? 'Verberg filters' : 'Geavanceerd zoeken'}`;
         elements.resetFiltersButton.style.display = isFiltersVisible ? 'inline-block' : 'none';
         
-        // Zorg ervoor dat de geavanceerde filters sectie correct getoond/verborgen wordt.
         if (!isFiltersVisible) {
-            isAdvancedVisible = false; // Reset state when hiding main filters
+            isAdvancedVisible = false;
             elements.advancedFilters.style.display = 'none';
             elements.toggleAdvanced.innerHTML = `<span id="advancedToggleIcon">▼</span> Meer opties`;
         }
@@ -221,9 +228,6 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.dateFrom.value = fromDate.toISOString().split('T')[0];
         elements.dateTo.value = toDate.toISOString().split('T')[0];
     };
-
-    const validateDateRange = () => { if (elements.dateFrom.value && elements.dateTo.value && new Date(elements.dateFrom.value) > new Date(elements.dateTo.value)) { showNotification('"Van" datum kan niet na "tot" datum liggen', 'error'); elements.dateTo.value = elements.dateFrom.value; } };
-    const validateModifiedDateRange = () => { if (elements.modifiedFrom.value && elements.modifiedTo.value && new Date(elements.modifiedFrom.value) > new Date(elements.modifiedTo.value)) { showNotification('"Van" datum kan niet na "tot" datum liggen', 'error'); elements.modifiedTo.value = elements.modifiedFrom.value; } };
 
     // --- AUTOCOMPLETE ---
     const handleAutocompleteDebounced = (input, suggestions, items) => {
@@ -314,16 +318,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         jurisprudenceCurrentResults = jurisprudenceMasterResults.filter(item => {
             if (!keyword) return true;
-
             const searchTargets = [];
             if (isInitialSearch || searchIn.includes('title')) searchTargets.push(item.title);
             if (isInitialSearch || searchIn.includes('summary')) searchTargets.push(item.summary);
             if (isInitialSearch || searchIn.includes('ecli')) searchTargets.push(item.ecli);
             if (isInitialSearch || searchIn.includes('zaaknummer')) searchTargets.push(item.zaaknummer);
-
-            return searchTargets.some(target => 
-                target.toLowerCase().includes(keyword)
-            );
+            return searchTargets.some(target => target.toLowerCase().includes(keyword));
         });
 
         if (jurisprudenceCurrentResults.length === 0) {
@@ -340,24 +340,50 @@ document.addEventListener('DOMContentLoaded', () => {
         renderJurisprudencePage(jurisprudenceCurrentPage);
     };
 
-    const searchRelatedLaws = (summary) => {
-        // Eenvoudige keyword extractie: negeer veelvoorkomende stopwoorden.
-        const stopWords = new Set(['de', 'het', 'een', 'en', 'van', 'in', 'op', 'met', 'is', 'zijn', 'aan', 'voor', 'door', 'als', 'dat', 'heeft']);
+    const showKeywordModal = (summary) => {
+        const stopWords = new Set(['de', 'het', 'een', 'en', 'van', 'in', 'op', 'met', 'is', 'zijn', 'aan', 'voor', 'door', 'als', 'dat', 'heeft', 'wordt', 'te', 'om', 'uit', 'bij', 'dan']);
         const keywords = summary.toLowerCase()
                                 .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"")
                                 .split(/\s+/)
-                                .filter(word => word.length > 3 && !stopWords.has(word))
-                                .slice(0, 5); // Gebruik de eerste 5 relevante trefwoorden
+                                .filter(word => word.length > 3 && !stopWords.has(word));
         
-        const keywordString = [...new Set(keywords)].join(' '); // Verwijder duplicaten en maak een string
+        const uniqueKeywords = [...new Set(keywords)].slice(0, 15); // Max 15 keywords
         
-        if (keywordString) {
-            elements.wettenbankKeyword.value = keywordString;
-            handleWettenbankSearch(true);
-            showNotification(`Zoeken in Wettenbank op trefwoorden: "${keywordString}"`, 'info');
-            elements.wettenbankKeyword.scrollIntoView({ behavior: 'smooth' });
+        elements.keywordOptions.innerHTML = ''; // Clear previous options
+        if (uniqueKeywords.length > 0) {
+            uniqueKeywords.forEach(keyword => {
+                const button = document.createElement('button');
+                button.className = 'keyword-button';
+                button.textContent = keyword;
+                button.dataset.keyword = keyword;
+                button.addEventListener('click', () => {
+                    button.classList.toggle('selected');
+                });
+                elements.keywordOptions.appendChild(button);
+            });
+            elements.keywordModal.style.display = 'flex';
         } else {
             showNotification('Geen unieke trefwoorden gevonden in de samenvatting.', 'warning');
+        }
+    };
+
+    const hideKeywordModal = () => {
+        elements.keywordModal.style.display = 'none';
+    };
+
+    const searchWithSelectedKeywords = () => {
+        const selectedButtons = elements.keywordOptions.querySelectorAll('.keyword-button.selected');
+        const selectedKeywords = Array.from(selectedButtons).map(btn => btn.dataset.keyword);
+
+        if (selectedKeywords.length > 0) {
+            const keywordString = selectedKeywords.join(' ');
+            elements.wettenbankKeyword.value = keywordString;
+            hideKeywordModal();
+            handleWettenbankSearch(true);
+            showNotification(`Zoeken in Wettenbank op: "${keywordString}"`, 'info');
+            elements.wettenbankKeyword.scrollIntoView({ behavior: 'smooth' });
+        } else {
+            showNotification('Selecteer minimaal één trefwoord om te zoeken.', 'error');
         }
     };
     
@@ -367,7 +393,7 @@ document.addEventListener('DOMContentLoaded', () => {
             wettenbankCurrentQuery = elements.wettenbankKeyword.value.trim();
             wettenbankCurrentPage = 1;
             wettenbankActiveFacets = {};
-            isWettenbankFiltersVisible = false; // Filters inklappen bij nieuwe zoekopdracht
+            isWettenbankFiltersVisible = false;
             elements.wettenbankFacets.style.display = 'none';
             elements.toggleWettenbankFiltersButton.style.display = 'none';
         }
@@ -378,12 +404,9 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.wettenbankResults.innerHTML = '';
         if (isNewSearch) elements.wettenbankFacets.innerHTML = '';
 
-        const keywordQuery = `cql.textAndIndexes = "${wettenbankCurrentQuery.replace(/"/g, '\\"')}"`; // escape double quotes
-        const facetClauses = Object.entries(wettenbankActiveFacets).map(([index, queries]) => {
-            if (queries.length > 1) {
-                return `(${queries.join(' OR ')})`;
-            }
-            return queries.length > 0 ? queries[0] : '';
+        const keywordQuery = `cql.textAndIndexes = "${wettenbankCurrentQuery.replace(/"/g, '\\"')}"`;
+        const facetClauses = Object.entries(wettenbankActiveFacets).map(([, queries]) => {
+            return queries.length > 1 ? `(${queries.join(' OR ')})` : queries.join('');
         }).filter(Boolean).join(' AND ');
 
         const finalQuery = facetClauses ? `(${keywordQuery}) AND (${facetClauses})` : keywordQuery;
@@ -431,21 +454,16 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             showStatus(elements.wettenbankStatus, `Fout: ${error.message}.`, 'error');
             console.error(error);
-            elements.wettenbankResults.innerHTML = '';
-            elements.wettenbankPagination.innerHTML = '';
         }
     };
 
     const handleFacetChange = (e) => {
         const checkbox = e.target;
         if (checkbox.type !== 'checkbox') return;
-
         const index = checkbox.dataset.facetIndex;
         const query = checkbox.dataset.facetQuery;
 
-        if (!wettenbankActiveFacets[index]) {
-            wettenbankActiveFacets[index] = [];
-        }
+        if (!wettenbankActiveFacets[index]) wettenbankActiveFacets[index] = [];
 
         if (checkbox.checked) {
             if (!wettenbankActiveFacets[index].includes(query)) {
@@ -472,8 +490,7 @@ document.addEventListener('DOMContentLoaded', () => {
         pageResults.forEach((item, index) => {
             const globalIndex = `jurisprudence-${startIndex + index}`;
             html += createResultItemHTML(
-                'jurisprudence',
-                item.title,
+                'jurisprudence', item.title,
                 `https://uitspraken.rechtspraak.nl/inziendocument?id=${encodeURIComponent(item.ecli)}`,
                 item.summary,
                 { "ECLI": item.ecli, "Zaaknummer": item.zaaknummer, "Bijgewerkt": item.updated.toLocaleDateString('nl-NL') },
@@ -481,12 +498,7 @@ document.addEventListener('DOMContentLoaded', () => {
             );
         });
         elements.jurisprudenceResults.innerHTML = html || "<p>Geen resultaten op deze pagina.</p>";
-        renderPagination(
-            elements.jurisprudencePagination,
-            jurisprudenceCurrentPage,
-            Math.ceil(jurisprudenceCurrentResults.length / jurisprudenceResultsPerPage),
-            'jurisprudence'
-        );
+        renderPagination(elements.jurisprudencePagination, jurisprudenceCurrentPage, Math.ceil(jurisprudenceCurrentResults.length / jurisprudenceResultsPerPage), 'jurisprudence');
     };
 
     const renderWettenbankResults = (xmlDoc) => {
@@ -494,53 +506,36 @@ document.addEventListener('DOMContentLoaded', () => {
         let html = '';
         records.forEach((record, index) => {
             const globalIndex = `wettenbank-${((wettenbankCurrentPage - 1) * wettenbankResultsPerPage) + index}`;
+            const meta = record.querySelector('meta'); // Zoek binnen de meta-tag
             
-            const title = record.querySelector('title')?.textContent || 'Geen titel';
-            const identifier = record.querySelector('identifier')?.textContent || '#';
-            const abstract = record.querySelector('abstract')?.textContent;
-            const creator = record.querySelector('creator')?.textContent || 'Onbekend';
-            const dateText = record.querySelector('date')?.textContent;
+            const title = meta?.querySelector('title')?.textContent || 'Geen titel';
+            const identifier = meta?.querySelector('identifier')?.textContent || '#';
+            const abstract = meta?.querySelector('abstract')?.textContent;
+            const creator = meta?.querySelector('creator')?.textContent || 'Onbekend';
+            const dateText = meta?.querySelector('date')?.textContent;
             const formattedDate = dateText ? new Date(dateText).toLocaleDateString('nl-NL') : 'Onbekend';
-            
-            // Gebruik 'abstract' als die er is, anders 'title'.
             const summary = abstract || 'Geen samenvatting beschikbaar.';
 
-            html += createResultItemHTML(
-                'wettenbank',
-                title,
-                identifier,
-                summary,
-                { "Door": creator, "Datum": formattedDate},
-                globalIndex
-            );
+            html += createResultItemHTML('wettenbank', title, identifier, summary, { "Door": creator, "Datum": formattedDate}, globalIndex);
         });
         elements.wettenbankResults.innerHTML = html || "<p>Geen documenten gevonden.</p>";
     };
 
     const createResultItemHTML = (type, title, link, summary, meta, index) => {
         const metaHTML = Object.entries(meta).map(([key, value]) => `<span><strong>${key}:</strong> ${value || 'n.v.t.'}</span>`).join('');
-        const summaryText = summary.length > 250 ? summary.substring(0, 250) + '...' : summary;
-
         let actionsHTML = `
             ${summary.length > 250 ? `<button class="tertiary-button read-more" data-target="summary-${index}" data-full-summary="${encodeURIComponent(summary)}">Lees meer</button>` : ''}
-            <button class="tertiary-button view-document-button" 
-                    data-title="${encodeURIComponent(title)}" 
-                    data-content="${encodeURIComponent(summary)}">
-                Bekijk document
-            </button>
-        `;
-
+            <button class="tertiary-button view-document-button" data-title="${encodeURIComponent(title)}" data-content="${encodeURIComponent(summary)}">Bekijk document</button>`;
         if (type === 'jurisprudence') {
             actionsHTML += `<button class="secondary-button search-related-laws-button" data-summary="${encodeURIComponent(summary)}">Zoek gerelateerde wetten</button>`;
         }
-
         return `
             <div class="result-item" data-index="${index}">
-                <div class="result-item-header">
-                    <h3><a href="${link}" target="_blank" rel="noopener noreferrer">${title}</a></h3>
+                <div>
+                    <div class="result-item-header"><h3><a href="${link}" target="_blank" rel="noopener noreferrer">${title}</a></h3></div>
+                    <div class="meta-info">${metaHTML}</div>
+                    <div class="summary" id="summary-${index}">${summary.substring(0, 250)}${summary.length > 250 ? '...' : ''}</div>
                 </div>
-                <div class="meta-info">${metaHTML}</div>
-                <div class="summary" id="summary-${index}">${summaryText}</div>
                 <div class="result-item-actions">${actionsHTML}</div>
             </div>`;
     };
@@ -552,30 +547,21 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.toggleWettenbankFiltersButton.style.display = 'none';
             return; 
         }
-
         let html = '<h3>Verfijn op:</h3>';
         const titleMap = { 'w.organisatietype': 'Organisatie Type', 'dt.type': 'Document Type' };
-        
         facets.forEach(facet => {
             const index = facet.querySelector('index')?.textContent;
             const terms = facet.querySelectorAll('term');
             if (terms.length === 0) return;
-
             html += `<details class="facet-group" open><summary>${titleMap[index] || index}</summary><div class="facet-options">`;
             terms.forEach(term => {
                 const actualTerm = term.querySelector('actualTerm')?.textContent;
                 const count = term.querySelector('count')?.textContent;
                 const query = term.querySelector('query')?.textContent;
-                html += `
-                    <label class="checkbox-option">
-                        <input type="checkbox" data-facet-query='${query}' data-facet-index="${index}">
-                        <span class="checkmark"></span>
-                        ${actualTerm} (${count})
-                    </label>`;
+                html += `<label class="checkbox-option"><input type="checkbox" data-facet-query='${query}' data-facet-index="${index}"><span class="checkmark"></span>${actualTerm} (${count})</label>`;
             });
             html += `</div></details>`;
         });
-
         elements.wettenbankFacets.innerHTML = html;
         elements.toggleWettenbankFiltersButton.style.display = 'inline-block';
         elements.toggleWettenbankFiltersButton.innerHTML = `<span id="wettenbankFilterToggleIcon">▼</span> Verfijn resultaten`;
@@ -585,20 +571,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const renderPagination = (container, currentPage, totalPages, type) => {
         container.innerHTML = '';
         if (totalPages <= 1) return;
-
         const totalResults = type === 'jurisprudence' ? jurisprudenceCurrentResults.length : wettenbankTotalResults;
         const resultsPerPage = type === 'jurisprudence' ? jurisprudenceResultsPerPage : wettenbankResultsPerPage;
-
-        let html = '<div class="pagination-controls">';
-        html += `<button data-type="${type}" data-page="${currentPage - 1}" ${currentPage === 1 ? 'disabled' : ''}>← Vorige</button>`;
-        html += `<span class="page-indicator">Pagina <input type="number" class="page-input" value="${currentPage}" min="1" max="${totalPages}" data-type="${type}" data-total-pages="${totalPages}"> van ${totalPages}</span>`;
-        html += `<button data-type="${type}" data-page="${currentPage + 1}" ${currentPage >= totalPages ? 'disabled' : ''}>Volgende →</button>`;
-        html += '</div>';
-        
+        let html = `<div class="pagination-controls">
+            <button data-type="${type}" data-page="${currentPage - 1}" ${currentPage === 1 ? 'disabled' : ''}>← Vorige</button>
+            <span class="page-indicator">Pagina <input type="number" class="page-input" value="${currentPage}" min="1" max="${totalPages}" data-type="${type}" data-total-pages="${totalPages}"> van ${totalPages}</span>
+            <button data-type="${type}" data-page="${currentPage + 1}" ${currentPage >= totalPages ? 'disabled' : ''}>Volgende →</button>
+        </div>`;
         const startResult = (currentPage - 1) * resultsPerPage + 1;
         const endResult = Math.min(currentPage * resultsPerPage, totalResults);
         html += `<div class="results-summary">Resultaten ${startResult}-${endResult} van ${totalResults}</div>`;
-        
         container.innerHTML = html;
     };
     
@@ -625,9 +607,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (event.target.tagName === 'BUTTON') {
             const type = event.target.dataset.type;
             const page = parseInt(event.target.dataset.page, 10);
-            if (type && !isNaN(page)) {
-                changePage(type, page);
-            }
+            if (type && !isNaN(page)) changePage(type, page);
         }
     };
     
@@ -636,35 +616,23 @@ document.addEventListener('DOMContentLoaded', () => {
             const type = event.target.dataset.type;
             const totalPages = parseInt(event.target.dataset.totalPages, 10);
             let page = parseInt(event.target.value, 10);
-            
             if (isNaN(page) || page < 1) page = 1;
             if (page > totalPages) page = totalPages;
-            
             event.target.value = page;
             changePage(type, page);
         }
     };
 
-
     // --- DOCUMENT VIEWER ---
     const showDocumentViewer = (title, content) => {
-        const viewerHTML = `
+        elements.documentViewer.innerHTML = `
             <div class="document-viewer-card">
-                <div class="document-viewer-header">
-                    <h3>${title}</h3>
-                </div>
-                <div class="document-viewer-body">
-                    ${content}
-                </div>
-                <div class="document-viewer-footer">
-                    <button id="closeViewerButton" class="primary-button">Terug</button>
-                </div>
-            </div>
-        `;
-        elements.documentViewer.innerHTML = viewerHTML;
+                <div class="document-viewer-header"><h3>${title}</h3></div>
+                <div class="document-viewer-body">${content}</div>
+                <div class="document-viewer-footer"><button id="closeViewerButton" class="primary-button">Terug</button></div>
+            </div>`;
         elements.documentViewer.style.display = 'flex';
         elements.mainContainer.classList.add('main-content-hidden');
-
         document.getElementById('closeViewerButton').addEventListener('click', hideDocumentViewer);
     };
 
@@ -681,7 +649,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const searchLawsButton = e.target.closest('.search-related-laws-button');
 
         if (readMoreButton) {
-            const targetId = readMoreButton.getAttribute('data-target');
+            const targetId = readMoreButton.dataset.target;
             const summaryElement = document.getElementById(targetId);
             const isExpanded = summaryElement.classList.toggle('expanded');
             if(isExpanded) {
@@ -692,16 +660,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 readMoreButton.textContent = 'Lees meer';
             }
         }
-
         if (viewDocumentButton) {
-            const title = decodeURIComponent(viewDocumentButton.dataset.title);
-            const content = decodeURIComponent(viewDocumentButton.dataset.content);
-            showDocumentViewer(title, content);
+            showDocumentViewer(decodeURIComponent(viewDocumentButton.dataset.title), decodeURIComponent(viewDocumentButton.dataset.content));
         }
-
         if (searchLawsButton) {
-            const summary = decodeURIComponent(searchLawsButton.dataset.summary);
-            searchRelatedLaws(summary);
+            showKeywordModal(decodeURIComponent(searchLawsButton.dataset.summary));
         }
     };
     
@@ -719,16 +682,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const notification = document.createElement('div');
         notification.className = `notification ${type}`;
         notification.textContent = message;
-        Object.assign(notification.style, {
-            position: 'fixed', top: '20px', right: '20px', padding: '12px 20px',
-            borderRadius: '6px', color: 'white', zIndex: '9999',
-            backgroundColor: type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : type === 'warning' ? '#ffc107' : '#007bff',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)', animation: 'slideInRight 0.3s ease'
-        });
         document.body.appendChild(notification);
         setTimeout(() => {
-            notification.style.animation = 'slideOutRight 0.3s ease';
-            setTimeout(() => notification.remove(), 300);
+            notification.style.animation = 'slideOutRight 0.3s ease forwards';
+            notification.addEventListener('animationend', () => notification.remove());
         }, 4000);
     };
 
@@ -736,12 +693,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); elements.quickSearchInput.focus(); }
         if (e.key === 'Escape') { 
-            if (elements.documentViewer.style.display === 'flex') {
-                hideDocumentViewer();
-            } else {
-                elements.creatorSuggestions.innerHTML = ''; 
-                document.activeElement.blur(); 
-            }
+            if (elements.documentViewer.style.display === 'flex') hideDocumentViewer();
+            else if (elements.keywordModal.style.display === 'flex') hideKeywordModal();
+            else { elements.creatorSuggestions.innerHTML = ''; document.activeElement.blur(); }
         }
     });
     
@@ -751,7 +705,13 @@ document.addEventListener('DOMContentLoaded', () => {
         @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes slideOutRight { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
         .spinner-small { display: inline-block; width: 16px; height: 16px; border: 2px solid #ffffff; border-radius: 50%; border-top-color: transparent; animation: spin 1s ease-in-out infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }`;
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .notification { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 6px; color: white; z-index: 9999; box-shadow: 0 4px 12px rgba(0,0,0,0.15); animation: slideInRight 0.3s ease forwards; }
+        .notification.success { background-color: #28a745; }
+        .notification.error { background-color: #dc3545; }
+        .notification.warning { background-color: #ffc107; color: #343a40; }
+        .notification.info { background-color: #007bff; }
+    `;
     document.head.appendChild(style);
 
     initializeApp();
