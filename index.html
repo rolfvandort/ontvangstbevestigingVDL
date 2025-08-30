@@ -87,6 +87,9 @@
                                     </div>
                                 </div>
                             </div>
+                             <div class="advanced-toggle">
+                                <button class="tertiary-button" id="toggleAdvanced"><span id="advancedToggleIcon">▼</span> Meer opties</button>
+                            </div>
                             <div class="filter-section advanced-section" id="advancedFilters" style="display: none;">
                                 <h3>Geavanceerde Filters</h3>
                                 <div class="advanced-filter-grid">
@@ -120,9 +123,6 @@
                                             <input type="date" id="modifiedTo" class="filter-input" placeholder="Tot datum">
                                         </div>
                                     </div>
-                                </div>
-                                <div class="advanced-toggle">
-                                    <button class="tertiary-button" id="toggleAdvanced"><span id="advancedToggleIcon">▼</span> Meer opties</button>
                                 </div>
                             </div>
                             <div class="action-buttons">
@@ -169,19 +169,7 @@
             </div>
 
             <div class="search-column">
-                <div class="dashboard-card" id="pinnedItemContainer" style="display: none;">
-                    <div class="card-header">
-                        <h3>📌 Gepind Dossier</h3>
-                    </div>
-                    <div class="card-body">
-                        <div id="pinnedItemContent"></div>
-                        <div class="search-triggers">
-                            <h5>Gerelateerde zoekopdrachten:</h5>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="dashboard-card">
+                 <div class="dashboard-card">
                     <div class="card-header">
                         <h3><span class="header-icon">🏛️</span> Wettenbank Zoeker (SRU 2.0)</h3>
                     </div>
@@ -193,10 +181,15 @@
                                 <button class="primary-button" id="wettenbankSearchButton">Zoek</button>
                             </div>
                         </div>
-                        <id="wettenbankStatus" class="status-message"></div>
-                        <id="wettenbankFacets" class="facet-container"></div>
-                        <id="wettenbankResults" class="results-container"></div>
-                        <id="wettenbankPagination" class="pagination-container"></div>
+                        <div id="wettenbankStatus" class="status-message"></div>
+                        <div class="filter-toggle-container">
+                             <button class="tertiary-button" id="toggleWettenbankFiltersButton" style="display: none;">
+                                <span id="wettenbankFilterToggleIcon">▼</span> Verfijn resultaten
+                            </button>
+                        </div>
+                        <div id="wettenbankFacets" class="facet-container" style="display: none;"></div>
+                        <div id="wettenbankResults" class="results-container"></div>
+                        <div id="wettenbankPagination" class="pagination-container"></div>
                     </div>
                 </div>
             </div>
