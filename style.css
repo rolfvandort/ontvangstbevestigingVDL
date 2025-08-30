@@ -96,7 +96,7 @@ body {
     transition: var(--transition);
 }
 
-.main-content-hidden .main-content-grid {
+.main-content-hidden {
     display: none;
 }
 
@@ -104,13 +104,13 @@ body {
 @media (min-width: 1024px) {
     .main-content-grid {
         grid-template-columns: 1fr 1fr;
+        align-items: stretch; /* Zorgt ervoor dat de kolommen even hoog worden */
     }
 }
 
 .search-column {
     display: flex;
     flex-direction: column;
-    gap: 24px;
 }
 
 
@@ -124,7 +124,7 @@ body {
     transition: var(--transition);
     display: flex;
     flex-direction: column;
-    flex-grow: 1;
+    flex-grow: 1; /* Essentieel voor gelijke hoogte */
 }
 
 .dashboard-card:hover {
@@ -151,6 +151,8 @@ body {
 .card-body {
     padding: 1.5rem;
     flex-grow: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Quick Search */
@@ -505,6 +507,7 @@ body {
     margin-top: 24px; 
     display: flex;
     flex-direction: column;
+    flex-grow: 1;
 }
 .result-item { 
     border-bottom: 1px solid var(--light-gray); 
@@ -512,8 +515,8 @@ body {
     transition: var(--transition);
     display: flex;
     flex-direction: column;
-    min-height: 220px; /* Vaste minimumhoogte voor items */
     justify-content: space-between;
+    flex-grow: 1;
 }
 .result-item:last-child { border-bottom: none; }
 .result-item:hover { background-color: #f8f9fa; padding-left: 12px; padding-right: 12px; margin-left: -12px; margin-right: -12px; border-radius: var(--border-radius); }
@@ -558,12 +561,12 @@ body {
     font-size: 0.9rem;
 }
 .result-item-actions .secondary-button {
-    margin-left: auto; /* Duwt de knop naar rechts */
+    margin-left: auto;
 }
 
 
 /* Pagination */
-.pagination-container { margin-top: 32px; }
+.pagination-container { margin-top: auto; padding-top: 32px; } /* Zorgt dat paginering onderaan de card blijft */
 .pagination-controls { display: flex; justify-content: center; align-items: center; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
 .pagination-controls button { padding: 8px 16px; border: 1px solid var(--card-border); background-color: white; cursor: pointer; border-radius: var(--border-radius); font-size: 0.9rem; color: var(--text-color); transition: var(--transition); }
 .pagination-controls button:hover:not(:disabled) { background-color: var(--light-gray); border-color: var(--medium-gray); }
@@ -582,20 +585,17 @@ body {
 .facet-container > h3 { margin: 0 0 12px 0; font-size: 1rem; font-weight: 600; }
 .facet-group { border: 1px solid var(--card-border); border-radius: var(--border-radius); margin-bottom: 12px; overflow: hidden; }
 .facet-group summary { cursor: pointer; padding: 10px 14px; font-weight: 600; list-style: none; display: flex; justify-content: space-between; align-items: center; background-color: var(--light-gray); }
-.facet-group summary::-webkit-details-marker { display: none; } /* Hide ugly triangle */
+.facet-group summary::-webkit-details-marker { display: none; }
 .facet-group summary::after { content: '▼'; transition: transform 0.2s; }
 .facet-group[open] > summary::after { transform: rotate(180deg); }
 .facet-group .facet-options { padding: 10px 14px; max-height: 200px; overflow-y: auto; }
 .facet-group .checkbox-option { font-size: 0.9rem; }
 
-/* Document Viewer */
-.document-viewer-container {
+/* --- MODAL STYLES --- */
+.modal-container {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
+    top: 0; left: 0; width: 100%; height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
     z-index: 1001;
     display: flex;
     align-items: center;
@@ -603,47 +603,76 @@ body {
     padding: 20px;
     animation: fadeIn 0.3s;
 }
-
-.document-viewer-card {
+.modal-card {
     background-color: var(--card-bg);
     border-radius: var(--border-radius-lg);
     box-shadow: var(--card-shadow-hover);
     width: 100%;
-    max-width: 900px;
-    height: 90vh;
+    max-width: 600px;
     display: flex;
     flex-direction: column;
+    animation: slideDown 0.3s;
 }
-
-.document-viewer-header {
+.modal-header {
     padding: 1rem 1.5rem;
     border-bottom: 1px solid var(--card-border);
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
-
-.document-viewer-header h3 {
-    margin: 0;
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--text-color);
+.modal-header h3 { margin: 0; font-size: 1.25rem; }
+.close-modal-button {
+    background: none; border: none; font-size: 2rem;
+    cursor: pointer; color: var(--text-muted); line-height: 1;
 }
-
-.document-viewer-body {
+.modal-body {
     padding: 1.5rem;
-    overflow-y: auto;
-    flex-grow: 1;
-    white-space: pre-wrap; /* Behoudt opmaak zoals witregels */
     line-height: 1.7;
 }
-
-.document-viewer-footer {
+.modal-body p { margin: 0 0 1rem 0; }
+.keyword-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.keyword-button {
+    padding: 8px 16px;
+    border: 1px solid var(--medium-gray);
+    border-radius: 20px;
+    cursor: pointer;
+    background-color: var(--light-gray);
+    transition: var(--transition);
+}
+.keyword-button:hover {
+    border-color: var(--primary-blue);
+}
+.keyword-button.selected {
+    background-color: var(--primary-blue);
+    color: white;
+    border-color: var(--primary-blue);
+}
+.modal-footer {
     padding: 1rem 1.5rem;
     border-top: 1px solid var(--card-border);
     text-align: right;
 }
 
+/* Document Viewer */
+.document-viewer-container, .document-viewer-card, .document-viewer-header, .document-viewer-body, .document-viewer-footer {
+    /* Hergebruik modal stijlen waar mogelijk, maar viewer heeft specifieke afmetingen */
+}
+.document-viewer-container {
+    /* Gebruikt dezelfde basis als modal-container */
+}
+.document-viewer-card {
+    max-width: 900px;
+    height: 90vh;
+}
+.document-viewer-body {
+    overflow-y: auto;
+    flex-grow: 1;
+    white-space: pre-wrap;
+}
 
 /* Responsive Design */
 @media (max-width: 1023px) {
@@ -653,8 +682,8 @@ body {
     .container { padding: 16px; }
     .card-header, .card-body { padding: 1rem; }
     .basic-filter-grid, .advanced-filter-grid { grid-template-columns: 1fr; gap: 16px; }
-    .date-inputs, .filter-toggle-container, .result-item-header, .meta-info, .pagination-controls, .search-input-container { flex-direction: column; }
-    .date-separator { text-align: center; }
+    .date-inputs, .filter-toggle-container, .result-item-header, .meta-info, .pagination-controls, .search-input-container { flex-direction: column; align-items: stretch; }
+    .date-separator { text-align: center; padding: 8px 0; }
     .quick-search-input { margin-bottom: 8px; }
     .checkbox-group { flex-direction: column; }
     .result-item-actions .secondary-button { margin-left: 0; }
@@ -680,7 +709,7 @@ body {
 }
 .filter-input:focus, .quick-search-input:focus, .primary-button:focus, .secondary-button:focus, .tertiary-button:focus { outline: 2px solid var(--primary-blue); outline-offset: 2px; }
 @media print {
-    .header-bar, .filter-toggle-container, .filters-section, .action-buttons, .pagination-container { display: none; }
+    .header-bar, .filter-toggle-container, .filters-section, .action-buttons, .pagination-container, .modal-container, .document-viewer-container { display: none; }
     .dashboard-card { box-shadow: none; border: 1px solid #000; }
     .result-item { break-inside: avoid; }
 }
