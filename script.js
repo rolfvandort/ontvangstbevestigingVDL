@@ -82,10 +82,10 @@ document.addEventListener('DOMContentLoaded', () => {
         wettenbankKeyword: document.getElementById('wettenbankKeyword'),
         wettenbankStatus: document.getElementById('wettenbankStatus'),
         wettenbankResults: document.getElementById('wettenbankResults'),
+        toggleWettenbankFiltersButton: document.getElementById('toggleWettenbankFiltersButton'),
+        wettenbankFilterToggleIcon: document.getElementById('wettenbankFilterToggleIcon'),
         wettenbankFacets: document.getElementById('wettenbankFacets'),
         wettenbankPagination: document.getElementById('wettenbankPagination'),
-        pinnedItemContainer: document.getElementById('pinnedItemContainer'),
-        pinnedItemContent: document.getElementById('pinnedItemContent'),
         documentViewer: document.getElementById('documentViewer')
     };
 
@@ -104,13 +104,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let debounceTimer = null;
     let isFiltersVisible = false;
     let isAdvancedVisible = false;
+    let isWettenbankFiltersVisible = false;
 
     // --- INITIALISATIE ---
     const initializeApp = () => {
         populateSelect(elements.subject, rechtsgebieden);
         populateSelect(elements.procedure, proceduresoorten);
         setupEventListeners();
-        loadStateFromURL();
     };
 
     const populateSelect = (select, items) => {
@@ -145,23 +145,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
         elements.wettenbankSearchButton.addEventListener('click', () => handleWettenbankSearch(true));
         elements.wettenbankKeyword.addEventListener('keypress', e => { if (e.key === 'Enter') handleWettenbankSearch(true); });
+        elements.toggleWettenbankFiltersButton.addEventListener('click', toggleWettenbankFilters);
         elements.wettenbankFacets.addEventListener('change', handleFacetChange);
+        
+        elements.jurisprudencePagination.addEventListener('click', handlePaginationClick);
+        elements.jurisprudencePagination.addEventListener('change', handlePageInputChange);
+        elements.wettenbankPagination.addEventListener('click', handlePaginationClick);
+        elements.wettenbankPagination.addEventListener('change', handlePageInputChange);
+
         document.addEventListener('click', (e) => { if (!e.target.closest('.autocomplete-container')) { elements.creatorSuggestions.innerHTML = ''; } });
-        elements.apiFilters.addEventListener('change', saveStateToURL);
     };
 
-    // --- FILTER MANAGEMENT (JURISPRUDENTIE) ---
+    // --- FILTER MANAGEMENT ---
     const toggleFilters = () => {
         isFiltersVisible = !isFiltersVisible;
         elements.apiFilters.style.display = isFiltersVisible ? 'block' : 'none';
         elements.showFiltersButton.innerHTML = `<span id="filterToggleIcon">${isFiltersVisible ? '▲' : '▼'}</span> ${isFiltersVisible ? 'Verberg filters' : 'Geavanceerd zoeken'}`;
         elements.resetFiltersButton.style.display = isFiltersVisible ? 'inline-block' : 'none';
+        
+        // Zorg ervoor dat de geavanceerde filters sectie correct getoond/verborgen wordt.
+        if (!isFiltersVisible) {
+            isAdvancedVisible = false; // Reset state when hiding main filters
+            elements.advancedFilters.style.display = 'none';
+            elements.toggleAdvanced.innerHTML = `<span id="advancedToggleIcon">▼</span> Meer opties`;
+        }
     };
-
+    
     const toggleAdvancedFilters = () => {
         isAdvancedVisible = !isAdvancedVisible;
         elements.advancedFilters.style.display = isAdvancedVisible ? 'block' : 'none';
         elements.toggleAdvanced.innerHTML = `<span id="advancedToggleIcon">${isAdvancedVisible ? '▲' : '▼'}</span> ${isAdvancedVisible ? 'Minder opties' : 'Meer opties'}`;
+    };
+
+    const toggleWettenbankFilters = () => {
+        isWettenbankFiltersVisible = !isWettenbankFiltersVisible;
+        elements.wettenbankFacets.style.display = isWettenbankFiltersVisible ? 'block' : 'none';
+        elements.toggleWettenbankFiltersButton.innerHTML = `<span id="wettenbankFilterToggleIcon">${isWettenbankFiltersVisible ? '▲' : '▼'}</span> ${isWettenbankFiltersVisible ? 'Verberg filters' : 'Verfijn resultaten'}`;
     };
 
     const resetAllFilters = () => {
@@ -181,14 +200,13 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.jurisprudencePagination.innerHTML = '';
         elements.jurisprudenceStatus.style.display = 'none';
         elements.smartSearchSection.classList.add('hidden');
-        history.pushState({}, '', window.location.pathname);
         showNotification('Alle filters zijn gewist', 'success');
     };
 
     const handlePeriodPresetChange = () => {
         const preset = elements.periodPreset.value;
         const today = new Date();
-        elements.customDateRange.style.display = preset === 'custom' ? 'block' : 'none';
+        elements.customDateRange.style.display = preset === 'custom' ? 'grid' : 'none';
         if (preset === 'custom') { elements.dateFrom.value = ''; elements.dateTo.value = ''; return; }
         let fromDate = new Date();
         let toDate = new Date();
@@ -235,7 +253,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- ZOEKFUNCTIES (JURISPRUDENTIE) ---
     const handleJurisprudenceSearch = async () => {
         showLoading(true);
-        unpinItem();
         elements.jurisprudenceResults.innerHTML = '';
         elements.jurisprudencePagination.innerHTML = '';
         elements.smartSearchSection.classList.add('hidden');
@@ -254,58 +271,25 @@ document.addEventListener('DOMContentLoaded', () => {
         params.append('max', '1000');
         params.append('sort', elements.sortOrder.value);
 
-        // We fetch the full metadata by making a second call with the ECLI's
-        // This is a workaround because the search feed is limited.
-        const searchRequestUrl = `${PROXY_URL}${encodeURIComponent(`https://data.rechtspraak.nl/uitspraken/zoeken?${params.toString()}`)}`;
+        const requestUrl = `${PROXY_URL}${encodeURIComponent(`https://data.rechtspraak.nl/uitspraken/zoeken?${params.toString()}`)}`;
 
         try {
-            const searchResponse = await fetch(searchRequestUrl);
-            if (!searchResponse.ok) throw new Error(`API-zoekverzoek mislukt: ${searchResponse.status}`);
-            const searchXmlString = await searchResponse.text();
-            const searchXmlDoc = new DOMParser().parseFromString(searchXmlString, "application/xml");
-            if (searchXmlDoc.getElementsByTagName("parsererror").length) throw new Error("Fout bij het verwerken van de zoek-XML.");
+            const response = await fetch(requestUrl);
+            if (!response.ok) throw new Error(`API-verzoek mislukt: ${response.status}`);
+            const xmlString = await response.text();
+            const xmlDoc = new DOMParser().parseFromString(xmlString, "application/xml");
+            if (xmlDoc.getElementsByTagName("parsererror").length) throw new Error("Fout bij het verwerken van de XML-data.");
             
-            const searchEntries = Array.from(searchXmlDoc.getElementsByTagName('entry'));
-            const ecliIds = searchEntries.map(entry => entry.querySelector('id')?.textContent).filter(Boolean);
-
-            if (ecliIds.length === 0) {
-                 jurisprudenceMasterResults = [];
-                 handleSmartSearch(true);
-                 return;
-            }
-            
-            // Now fetch detailed metadata for each ECLI.
-            const detailedResults = await Promise.all(ecliIds.map(async (ecli) => {
-                const contentUrl = `${PROXY_URL}${encodeURIComponent(`https://data.rechtspraak.nl/uitspraken/content?id=${ecli}`)}`;
-                try {
-                    const contentResponse = await fetch(contentUrl);
-                    if (!contentResponse.ok) return null;
-                    const contentXmlString = await contentResponse.text();
-                    const contentXmlDoc = new DOMParser().parseFromString(contentXmlString, "application/xml");
-                    if (contentXmlDoc.getElementsByTagName("parsererror").length) return null;
-                    
-                    // Helper to get text content, including from namespaced elements
-                    const getText = (selector) => contentXmlDoc.querySelector(selector)?.textContent || null;
-                    
-                    return {
-                        title: getText('title') || 'Geen titel',
-                        ecli: ecli,
-                        summary: getText('abstract') || getText('inhoudsindicatie') || 'Geen samenvatting.',
-                        updated: new Date(getText('modified')),
-                        issued: getText('issued') ? new Date(getText('issued')) : null,
-                        zaaknummer: getText('zaaknummer') || 'Niet gevonden',
-                        instantie: getText('creator') || 'Onbekend',
-                        rechtsgebied: getText('subject') || 'Onbekend',
-                        procedure: getText('procedure') || 'Onbekend',
-                    };
-                } catch (e) {
-                    console.error(`Fout bij ophalen van content voor ${ecli}:`, e);
-                    return null; // Return null on error for this specific item
-                }
+            const entries = xmlDoc.getElementsByTagName('entry');
+            jurisprudenceMasterResults = Array.from(entries).map(entry => ({
+                title: entry.querySelector('title')?.textContent || 'Geen titel',
+                ecli: entry.querySelector('id')?.textContent || '',
+                summary: entry.querySelector('summary')?.textContent || 'Geen samenvatting.',
+                updated: new Date(entry.querySelector('updated')?.textContent),
+                zaaknummer: entry.querySelector('zaaknummer, \\:zaaknummer')?.textContent || 'Niet gevonden'
             }));
-            
-            jurisprudenceMasterResults = detailedResults.filter(Boolean); // Filter out any nulls from failed fetches
-            handleSmartSearch(true);
+
+            handleSmartSearch(true); 
 
         } catch (error) {
             showStatus(elements.jurisprudenceStatus, `Fout: ${error.message}.`, 'error');
@@ -315,21 +299,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-
     const handleSmartSearch = (isInitialSearch = false) => {
-        const keyword = elements.quickSearchInput.value.toLowerCase().trim();
+        const keyword = isInitialSearch ? elements.quickSearchInput.value.toLowerCase().trim() : elements.smartSearchInput.value.toLowerCase().trim();
         const searchIn = Array.from(elements.searchInCheckboxes).filter(cb => cb.checked).map(cb => cb.value);
 
         if (!isInitialSearch && searchIn.length === 0) {
             showNotification('Selecteer minimaal één veld om in te zoeken', 'error');
             return;
         }
+        
+        if (isInitialSearch) {
+            elements.smartSearchInput.value = elements.quickSearchInput.value;
+        }
 
         jurisprudenceCurrentResults = jurisprudenceMasterResults.filter(item => {
             if (!keyword) return true;
 
             const searchTargets = [];
-            // Use all fields for initial quick search, selected fields for subsequent filtering
             if (isInitialSearch || searchIn.includes('title')) searchTargets.push(item.title);
             if (isInitialSearch || searchIn.includes('summary')) searchTargets.push(item.summary);
             if (isInitialSearch || searchIn.includes('ecli')) searchTargets.push(item.ecli);
@@ -341,7 +327,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (jurisprudenceCurrentResults.length === 0) {
-            showStatus(elements.jurisprudenceStatus, 'Geen resultaten gevonden voor deze criteria.', 'error');
+            showStatus(elements.jurisprudenceStatus, 'Geen resultaten gevonden voor deze criteria.', 'warning');
+            elements.jurisprudenceResults.innerHTML = '';
+            elements.jurisprudencePagination.innerHTML = '';
         } else {
             const message = `${jurisprudenceCurrentResults.length} resultaten gevonden`;
             showStatus(elements.jurisprudenceStatus, message, 'success');
@@ -351,6 +339,27 @@ document.addEventListener('DOMContentLoaded', () => {
         jurisprudenceCurrentPage = 1;
         renderJurisprudencePage(jurisprudenceCurrentPage);
     };
+
+    const searchRelatedLaws = (summary) => {
+        // Eenvoudige keyword extractie: negeer veelvoorkomende stopwoorden.
+        const stopWords = new Set(['de', 'het', 'een', 'en', 'van', 'in', 'op', 'met', 'is', 'zijn', 'aan', 'voor', 'door', 'als', 'dat', 'heeft']);
+        const keywords = summary.toLowerCase()
+                                .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"")
+                                .split(/\s+/)
+                                .filter(word => word.length > 3 && !stopWords.has(word))
+                                .slice(0, 5); // Gebruik de eerste 5 relevante trefwoorden
+        
+        const keywordString = [...new Set(keywords)].join(' '); // Verwijder duplicaten en maak een string
+        
+        if (keywordString) {
+            elements.wettenbankKeyword.value = keywordString;
+            handleWettenbankSearch(true);
+            showNotification(`Zoeken in Wettenbank op trefwoorden: "${keywordString}"`, 'info');
+            elements.wettenbankKeyword.scrollIntoView({ behavior: 'smooth' });
+        } else {
+            showNotification('Geen unieke trefwoorden gevonden in de samenvatting.', 'warning');
+        }
+    };
     
     // --- WETTENBANK SEARCH (SRU 2.0) ---
     const handleWettenbankSearch = async (isNewSearch = false) => {
@@ -358,6 +367,9 @@ document.addEventListener('DOMContentLoaded', () => {
             wettenbankCurrentQuery = elements.wettenbankKeyword.value.trim();
             wettenbankCurrentPage = 1;
             wettenbankActiveFacets = {};
+            isWettenbankFiltersVisible = false; // Filters inklappen bij nieuwe zoekopdracht
+            elements.wettenbankFacets.style.display = 'none';
+            elements.toggleWettenbankFiltersButton.style.display = 'none';
         }
 
         if (!wettenbankCurrentQuery) { showNotification('Voer een trefwoord in.', 'error'); return; }
@@ -366,7 +378,7 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.wettenbankResults.innerHTML = '';
         if (isNewSearch) elements.wettenbankFacets.innerHTML = '';
 
-        const keywordQuery = `cql.textAndIndexes = "${wettenbankCurrentQuery}"`;
+        const keywordQuery = `cql.textAndIndexes = "${wettenbankCurrentQuery.replace(/"/g, '\\"')}"`; // escape double quotes
         const facetClauses = Object.entries(wettenbankActiveFacets).map(([index, queries]) => {
             if (queries.length > 1) {
                 return `(${queries.join(' OR ')})`;
@@ -376,11 +388,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const finalQuery = facetClauses ? `(${keywordQuery}) AND (${facetClauses})` : keywordQuery;
         
-        const params = new URLSearchParams();
-        params.append('query', finalQuery);
-        params.append('maximumRecords', wettenbankResultsPerPage);
-        params.append('startRecord', ((wettenbankCurrentPage - 1) * wettenbankResultsPerPage) + 1);
-        if (isNewSearch) params.append('facetLimit', '10:w.organisatietype,10:dt.type');
+        const params = new URLSearchParams({
+            query: finalQuery,
+            maximumRecords: wettenbankResultsPerPage,
+            startRecord: ((wettenbankCurrentPage - 1) * wettenbankResultsPerPage) + 1,
+        });
+
+        if (isNewSearch) {
+            params.append('facetLimit', '10:w.organisatietype,10:dt.type');
+        }
 
         const requestUrl = `${PROXY_URL}https://repository.overheid.nl/sru/Search`;
 
@@ -396,12 +412,22 @@ document.addEventListener('DOMContentLoaded', () => {
             if (xmlDoc.getElementsByTagName("parsererror").length) throw new Error("Fout bij verwerken XML.");
             
             wettenbankTotalResults = parseInt(xmlDoc.querySelector('numberOfRecords')?.textContent || '0', 10);
-            showStatus(elements.wettenbankStatus, `${wettenbankTotalResults} resultaten voor "${wettenbankCurrentQuery}"`, 'success');
+            
+            if(wettenbankTotalResults === 0) {
+                 showStatus(elements.wettenbankStatus, `Geen resultaten gevonden voor "${wettenbankCurrentQuery}"`, 'warning');
+                 elements.wettenbankResults.innerHTML = '<p>Probeer een andere zoekterm.</p>';
+                 elements.wettenbankPagination.innerHTML = '';
+                 elements.toggleWettenbankFiltersButton.style.display = 'none';
+                 return;
+            }
 
+            showStatus(elements.wettenbankStatus, `${wettenbankTotalResults} resultaten voor "${wettenbankCurrentQuery}"`, 'success');
+            
             renderWettenbankResults(xmlDoc);
             renderPagination(elements.wettenbankPagination, wettenbankCurrentPage, Math.ceil(wettenbankTotalResults / wettenbankResultsPerPage), 'wettenbank');
-            if (isNewSearch) renderWettenbankFacets(xmlDoc);
-
+            if (isNewSearch) {
+                renderWettenbankFacets(xmlDoc);
+            }
         } catch (error) {
             showStatus(elements.wettenbankStatus, `Fout: ${error.message}.`, 'error');
             console.error(error);
@@ -445,21 +471,12 @@ document.addEventListener('DOMContentLoaded', () => {
         let html = '';
         pageResults.forEach((item, index) => {
             const globalIndex = `jurisprudence-${startIndex + index}`;
-            const meta = {
-                "ECLI": item.ecli,
-                "Zaaknummer": item.zaaknummer,
-                "Instantie": item.instantie,
-                "Rechtsgebied": item.rechtsgebied,
-                "Procedure": item.procedure,
-                "Gepubliceerd": item.issued ? item.issued.toLocaleDateString('nl-NL') : 'Onbekend',
-                "Bijgewerkt": item.updated.toLocaleDateString('nl-NL'),
-            };
-
             html += createResultItemHTML(
+                'jurisprudence',
                 item.title,
                 `https://uitspraken.rechtspraak.nl/inziendocument?id=${encodeURIComponent(item.ecli)}`,
                 item.summary,
-                meta,
+                { "ECLI": item.ecli, "Zaaknummer": item.zaaknummer, "Bijgewerkt": item.updated.toLocaleDateString('nl-NL') },
                 globalIndex
             );
         });
@@ -473,46 +490,50 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const renderWettenbankResults = (xmlDoc) => {
-        const records = xmlDoc.querySelectorAll('record');
+        const records = xmlDoc.querySelectorAll('recordData');
         let html = '';
         records.forEach((record, index) => {
             const globalIndex = `wettenbank-${((wettenbankCurrentPage - 1) * wettenbankResultsPerPage) + index}`;
+            
+            const title = record.querySelector('title')?.textContent || 'Geen titel';
             const identifier = record.querySelector('identifier')?.textContent || '#';
+            const abstract = record.querySelector('abstract')?.textContent;
+            const creator = record.querySelector('creator')?.textContent || 'Onbekend';
             const dateText = record.querySelector('date')?.textContent;
             const formattedDate = dateText ? new Date(dateText).toLocaleDateString('nl-NL') : 'Onbekend';
             
-            // Helper function to get node text content
-            const getNodeText = (selector) => {
-                const node = record.querySelector(selector);
-                return node ? node.textContent : 'Onbekend';
-            };
-
-            const metaData = {
-                "Door": getNodeText('creator'),
-                "Datum": formattedDate,
-                "Documenttype": getNodeText('type'),
-                "Publicatieblad": getNodeText('publicatienaam'),
-                "Locatie": getNodeText('spatial'),
-                "Thema": getNodeText('subject')
-            };
+            // Gebruik 'abstract' als die er is, anders 'title'.
+            const summary = abstract || 'Geen samenvatting beschikbaar.';
 
             html += createResultItemHTML(
-                getNodeText('title') || 'Geen titel',
+                'wettenbank',
+                title,
                 identifier,
-                getNodeText('abstract') || 'Geen beschrijving beschikbaar.',
-                metaData,
+                summary,
+                { "Door": creator, "Datum": formattedDate},
                 globalIndex
             );
         });
         elements.wettenbankResults.innerHTML = html || "<p>Geen documenten gevonden.</p>";
     };
 
-
-    const createResultItemHTML = (title, link, summary, meta, index) => {
-        const metaHTML = Object.entries(meta)
-            .filter(([key, value]) => value && value.trim() !== 'Onbekend' && value.trim() !== '') // Filter out empty or 'Onbekend' values
-            .map(([key, value]) => `<span><strong>${key}:</strong> ${value || 'n.v.t.'}</span>`).join('');
+    const createResultItemHTML = (type, title, link, summary, meta, index) => {
+        const metaHTML = Object.entries(meta).map(([key, value]) => `<span><strong>${key}:</strong> ${value || 'n.v.t.'}</span>`).join('');
         const summaryText = summary.length > 250 ? summary.substring(0, 250) + '...' : summary;
+
+        let actionsHTML = `
+            ${summary.length > 250 ? `<button class="tertiary-button read-more" data-target="summary-${index}" data-full-summary="${encodeURIComponent(summary)}">Lees meer</button>` : ''}
+            <button class="tertiary-button view-document-button" 
+                    data-title="${encodeURIComponent(title)}" 
+                    data-content="${encodeURIComponent(summary)}">
+                Bekijk document
+            </button>
+        `;
+
+        if (type === 'jurisprudence') {
+            actionsHTML += `<button class="secondary-button search-related-laws-button" data-summary="${encodeURIComponent(summary)}">Zoek gerelateerde wetten</button>`;
+        }
+
         return `
             <div class="result-item" data-index="${index}">
                 <div class="result-item-header">
@@ -520,26 +541,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="meta-info">${metaHTML}</div>
                 <div class="summary" id="summary-${index}">${summaryText}</div>
-                <div class="result-item-actions">
-                    ${summary.length > 250 ? `<div class="read-more" data-target="summary-${index}" data-full-summary="${encodeURIComponent(summary)}">Lees meer</div>` : ''}
-                    <button class="tertiary-button view-document-button" 
-                            data-title="${encodeURIComponent(title)}" 
-                            data-content="${encodeURIComponent(summary)}"
-                            style="padding: 8px 16px; font-size: 0.9rem; margin-left: auto;">
-                        Bekijk document
-                    </button>
-                </div>
+                <div class="result-item-actions">${actionsHTML}</div>
             </div>`;
     };
 
     const renderWettenbankFacets = (xmlDoc) => {
         const facets = xmlDoc.querySelectorAll('facet');
-        if (facets.length === 0) { elements.wettenbankFacets.innerHTML = ''; return; }
+        if (facets.length === 0) { 
+            elements.wettenbankFacets.innerHTML = ''; 
+            elements.toggleWettenbankFiltersButton.style.display = 'none';
+            return; 
+        }
+
         let html = '<h3>Verfijn op:</h3>';
         const titleMap = { 'w.organisatietype': 'Organisatie Type', 'dt.type': 'Document Type' };
+        
         facets.forEach(facet => {
             const index = facet.querySelector('index')?.textContent;
             const terms = facet.querySelectorAll('term');
+            if (terms.length === 0) return;
+
             html += `<details class="facet-group" open><summary>${titleMap[index] || index}</summary><div class="facet-options">`;
             terms.forEach(term => {
                 const actualTerm = term.querySelector('actualTerm')?.textContent;
@@ -554,19 +575,24 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             html += `</div></details>`;
         });
+
         elements.wettenbankFacets.innerHTML = html;
+        elements.toggleWettenbankFiltersButton.style.display = 'inline-block';
+        elements.toggleWettenbankFiltersButton.innerHTML = `<span id="wettenbankFilterToggleIcon">▼</span> Verfijn resultaten`;
     };
     
     // --- PAGINERING ---
     const renderPagination = (container, currentPage, totalPages, type) => {
-        if (totalPages <= 1) { container.innerHTML = ''; return; }
+        container.innerHTML = '';
+        if (totalPages <= 1) return;
+
         const totalResults = type === 'jurisprudence' ? jurisprudenceCurrentResults.length : wettenbankTotalResults;
         const resultsPerPage = type === 'jurisprudence' ? jurisprudenceResultsPerPage : wettenbankResultsPerPage;
 
         let html = '<div class="pagination-controls">';
-        html += `<button ${currentPage === 1 ? 'disabled' : ''} onclick="changePage('${type}', ${currentPage - 1})">← Vorige</button>`;
-        html += `<span id="pageIndicator">Pagina <input type="number" class="page-input" value="${currentPage}" min="1" max="${totalPages}" onchange="handlePageInputChange(event, '${type}', ${totalPages})"> van ${totalPages}</span>`;
-        html += `<button ${currentPage >= totalPages ? 'disabled' : ''} onclick="changePage('${type}', ${currentPage + 1})">Volgende →</button>`;
+        html += `<button data-type="${type}" data-page="${currentPage - 1}" ${currentPage === 1 ? 'disabled' : ''}>← Vorige</button>`;
+        html += `<span class="page-indicator">Pagina <input type="number" class="page-input" value="${currentPage}" min="1" max="${totalPages}" data-type="${type}" data-total-pages="${totalPages}"> van ${totalPages}</span>`;
+        html += `<button data-type="${type}" data-page="${currentPage + 1}" ${currentPage >= totalPages ? 'disabled' : ''}>Volgende →</button>`;
         html += '</div>';
         
         const startResult = (currentPage - 1) * resultsPerPage + 1;
@@ -576,7 +602,7 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = html;
     };
     
-    window.changePage = (type, page) => {
+    const changePage = (type, page) => {
         page = parseInt(page, 10);
         if (isNaN(page) || page < 1) page = 1;
 
@@ -585,23 +611,40 @@ document.addEventListener('DOMContentLoaded', () => {
             if (page > totalPages) page = totalPages;
             jurisprudenceCurrentPage = page;
             renderJurisprudencePage(page);
-            elements.jurisprudenceResults.scrollIntoView({ behavior: 'smooth' });
+            elements.jurisprudenceResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
         } else if (type === 'wettenbank') {
             const totalPages = Math.ceil(wettenbankTotalResults / wettenbankResultsPerPage);
             if (page > totalPages) page = totalPages;
             wettenbankCurrentPage = page;
             handleWettenbankSearch(false);
-            elements.wettenbankResults.scrollIntoView({ behavior: 'smooth' });
+            elements.wettenbankResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    };
+
+    const handlePaginationClick = (event) => {
+        if (event.target.tagName === 'BUTTON') {
+            const type = event.target.dataset.type;
+            const page = parseInt(event.target.dataset.page, 10);
+            if (type && !isNaN(page)) {
+                changePage(type, page);
+            }
         }
     };
     
-    window.handlePageInputChange = (event, type, totalPages) => {
-        let page = parseInt(event.target.value, 10);
-        if (isNaN(page) || page < 1) page = 1;
-        if (page > totalPages) page = totalPages;
-        event.target.value = page; // Correct input if invalid
-        changePage(type, page);
+    const handlePageInputChange = (event) => {
+        if (event.target.classList.contains('page-input')) {
+            const type = event.target.dataset.type;
+            const totalPages = parseInt(event.target.dataset.totalPages, 10);
+            let page = parseInt(event.target.value, 10);
+            
+            if (isNaN(page) || page < 1) page = 1;
+            if (page > totalPages) page = totalPages;
+            
+            event.target.value = page;
+            changePage(type, page);
+        }
     };
+
 
     // --- DOCUMENT VIEWER ---
     const showDocumentViewer = (title, content) => {
@@ -635,6 +678,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const handleResultsClick = (e) => {
         const readMoreButton = e.target.closest('.read-more');
         const viewDocumentButton = e.target.closest('.view-document-button');
+        const searchLawsButton = e.target.closest('.search-related-laws-button');
 
         if (readMoreButton) {
             const targetId = readMoreButton.getAttribute('data-target');
@@ -654,11 +698,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const content = decodeURIComponent(viewDocumentButton.dataset.content);
             showDocumentViewer(title, content);
         }
+
+        if (searchLawsButton) {
+            const summary = decodeURIComponent(searchLawsButton.dataset.summary);
+            searchRelatedLaws(summary);
+        }
     };
     
-    const unpinItem = () => { elements.pinnedItemContainer.style.display = 'none'; elements.pinnedItemContent.innerHTML = ''; };
-    window.unpinItem = unpinItem;
-
     const showLoading = (show) => { 
         elements.loadingIndicator.style.display = show ? 'flex' : 'none'; 
         elements.apiSearchButton.disabled = show; 
@@ -676,18 +722,15 @@ document.addEventListener('DOMContentLoaded', () => {
         Object.assign(notification.style, {
             position: 'fixed', top: '20px', right: '20px', padding: '12px 20px',
             borderRadius: '6px', color: 'white', zIndex: '9999',
-            backgroundColor: type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#007bff',
+            backgroundColor: type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : type === 'warning' ? '#ffc107' : '#007bff',
             boxShadow: '0 4px 12px rgba(0,0,0,0.15)', animation: 'slideInRight 0.3s ease'
         });
         document.body.appendChild(notification);
         setTimeout(() => {
             notification.style.animation = 'slideOutRight 0.3s ease';
             setTimeout(() => notification.remove(), 300);
-        }, 3000);
+        }, 4000);
     };
-
-    const saveStateToURL = () => { /* Placeholder for future implementation */ };
-    const loadStateFromURL = () => { /* Placeholder for future implementation */ };
 
     // --- KEYBOARD SHORTCUTS ---
     document.addEventListener('keydown', (e) => {
