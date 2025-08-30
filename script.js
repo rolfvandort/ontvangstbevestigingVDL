@@ -45,6 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- DOM ELEMENTEN ---
     const elements = {
+        mainContainer: document.getElementById('mainContainer'),
         jurisprudenceCard: document.getElementById('jurisprudenceCard'),
         apiFilters: document.getElementById('apiFilters'),
         showFiltersButton: document.getElementById('showFiltersButton'),
@@ -84,7 +85,8 @@ document.addEventListener('DOMContentLoaded', () => {
         wettenbankFacets: document.getElementById('wettenbankFacets'),
         wettenbankPagination: document.getElementById('wettenbankPagination'),
         pinnedItemContainer: document.getElementById('pinnedItemContainer'),
-        pinnedItemContent: document.getElementById('pinnedItemContent')
+        pinnedItemContent: document.getElementById('pinnedItemContent'),
+        documentViewer: document.getElementById('documentViewer')
     };
 
     // --- GLOBALE STATE ---
@@ -137,7 +139,10 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.apiSearchButton.addEventListener('click', handleJurisprudenceSearch);
         elements.smartFilterButton.addEventListener('click', handleSmartSearch);
         elements.smartSearchInput.addEventListener('keypress', e => { if (e.key === 'Enter') handleSmartSearch(); });
+        
         elements.jurisprudenceResults.addEventListener('click', handleResultsClick);
+        elements.wettenbankResults.addEventListener('click', handleResultsClick);
+
         elements.wettenbankSearchButton.addEventListener('click', () => handleWettenbankSearch(true));
         elements.wettenbankKeyword.addEventListener('keypress', e => { if (e.key === 'Enter') handleWettenbankSearch(true); });
         elements.wettenbankFacets.addEventListener('change', handleFacetChange);
@@ -249,25 +254,58 @@ document.addEventListener('DOMContentLoaded', () => {
         params.append('max', '1000');
         params.append('sort', elements.sortOrder.value);
 
-        const requestUrl = `${PROXY_URL}${encodeURIComponent(`https://data.rechtspraak.nl/uitspraken/zoeken?${params.toString()}`)}`;
+        // We fetch the full metadata by making a second call with the ECLI's
+        // This is a workaround because the search feed is limited.
+        const searchRequestUrl = `${PROXY_URL}${encodeURIComponent(`https://data.rechtspraak.nl/uitspraken/zoeken?${params.toString()}`)}`;
 
         try {
-            const response = await fetch(requestUrl);
-            if (!response.ok) throw new Error(`API-verzoek mislukt: ${response.status}`);
-            const xmlString = await response.text();
-            const xmlDoc = new DOMParser().parseFromString(xmlString, "application/xml");
-            if (xmlDoc.getElementsByTagName("parsererror").length) throw new Error("Fout bij het verwerken van de XML-data.");
+            const searchResponse = await fetch(searchRequestUrl);
+            if (!searchResponse.ok) throw new Error(`API-zoekverzoek mislukt: ${searchResponse.status}`);
+            const searchXmlString = await searchResponse.text();
+            const searchXmlDoc = new DOMParser().parseFromString(searchXmlString, "application/xml");
+            if (searchXmlDoc.getElementsByTagName("parsererror").length) throw new Error("Fout bij het verwerken van de zoek-XML.");
             
-            const entries = xmlDoc.getElementsByTagName('entry');
-            jurisprudenceMasterResults = Array.from(entries).map(entry => ({
-                title: entry.querySelector('title')?.textContent || 'Geen titel',
-                ecli: entry.querySelector('id')?.textContent || '',
-                summary: entry.querySelector('summary')?.textContent || 'Geen samenvatting.',
-                updated: new Date(entry.querySelector('updated')?.textContent),
-                zaaknummer: entry.querySelector('zaaknummer, \\:zaaknummer')?.textContent || 'Niet gevonden'
-            }));
+            const searchEntries = Array.from(searchXmlDoc.getElementsByTagName('entry'));
+            const ecliIds = searchEntries.map(entry => entry.querySelector('id')?.textContent).filter(Boolean);
 
-            handleSmartSearch(true); // Always apply smart search after fetching
+            if (ecliIds.length === 0) {
+                 jurisprudenceMasterResults = [];
+                 handleSmartSearch(true);
+                 return;
+            }
+            
+            // Now fetch detailed metadata for each ECLI.
+            const detailedResults = await Promise.all(ecliIds.map(async (ecli) => {
+                const contentUrl = `${PROXY_URL}${encodeURIComponent(`https://data.rechtspraak.nl/uitspraken/content?id=${ecli}`)}`;
+                try {
+                    const contentResponse = await fetch(contentUrl);
+                    if (!contentResponse.ok) return null;
+                    const contentXmlString = await contentResponse.text();
+                    const contentXmlDoc = new DOMParser().parseFromString(contentXmlString, "application/xml");
+                    if (contentXmlDoc.getElementsByTagName("parsererror").length) return null;
+                    
+                    // Helper to get text content, including from namespaced elements
+                    const getText = (selector) => contentXmlDoc.querySelector(selector)?.textContent || null;
+                    
+                    return {
+                        title: getText('title') || 'Geen titel',
+                        ecli: ecli,
+                        summary: getText('abstract') || getText('inhoudsindicatie') || 'Geen samenvatting.',
+                        updated: new Date(getText('modified')),
+                        issued: getText('issued') ? new Date(getText('issued')) : null,
+                        zaaknummer: getText('zaaknummer') || 'Niet gevonden',
+                        instantie: getText('creator') || 'Onbekend',
+                        rechtsgebied: getText('subject') || 'Onbekend',
+                        procedure: getText('procedure') || 'Onbekend',
+                    };
+                } catch (e) {
+                    console.error(`Fout bij ophalen van content voor ${ecli}:`, e);
+                    return null; // Return null on error for this specific item
+                }
+            }));
+            
+            jurisprudenceMasterResults = detailedResults.filter(Boolean); // Filter out any nulls from failed fetches
+            handleSmartSearch(true);
 
         } catch (error) {
             showStatus(elements.jurisprudenceStatus, `Fout: ${error.message}.`, 'error');
@@ -276,6 +314,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showLoading(false);
         }
     };
+
 
     const handleSmartSearch = (isInitialSearch = false) => {
         const keyword = elements.quickSearchInput.value.toLowerCase().trim();
@@ -406,11 +445,21 @@ document.addEventListener('DOMContentLoaded', () => {
         let html = '';
         pageResults.forEach((item, index) => {
             const globalIndex = `jurisprudence-${startIndex + index}`;
+            const meta = {
+                "ECLI": item.ecli,
+                "Zaaknummer": item.zaaknummer,
+                "Instantie": item.instantie,
+                "Rechtsgebied": item.rechtsgebied,
+                "Procedure": item.procedure,
+                "Gepubliceerd": item.issued ? item.issued.toLocaleDateString('nl-NL') : 'Onbekend',
+                "Bijgewerkt": item.updated.toLocaleDateString('nl-NL'),
+            };
+
             html += createResultItemHTML(
                 item.title,
                 `https://uitspraken.rechtspraak.nl/inziendocument?id=${encodeURIComponent(item.ecli)}`,
                 item.summary,
-                { "ECLI": item.ecli, "Zaaknummer": item.zaaknummer, "Bijgewerkt": item.updated.toLocaleDateString('nl-NL') },
+                meta,
                 globalIndex
             );
         });
@@ -432,19 +481,37 @@ document.addEventListener('DOMContentLoaded', () => {
             const dateText = record.querySelector('date')?.textContent;
             const formattedDate = dateText ? new Date(dateText).toLocaleDateString('nl-NL') : 'Onbekend';
             
+            // Helper function to get node text content
+            const getNodeText = (selector) => {
+                const node = record.querySelector(selector);
+                return node ? node.textContent : 'Onbekend';
+            };
+
+            const metaData = {
+                "Door": getNodeText('creator'),
+                "Datum": formattedDate,
+                "Documenttype": getNodeText('type'),
+                "Publicatieblad": getNodeText('publicatienaam'),
+                "Locatie": getNodeText('spatial'),
+                "Thema": getNodeText('subject')
+            };
+
             html += createResultItemHTML(
-                record.querySelector('title')?.textContent || 'Geen titel',
+                getNodeText('title') || 'Geen titel',
                 identifier,
-                record.querySelector('abstract')?.textContent || 'Geen beschrijving beschikbaar.',
-                { "Door": record.querySelector('creator')?.textContent || 'Onbekend', "Datum": formattedDate},
+                getNodeText('abstract') || 'Geen beschrijving beschikbaar.',
+                metaData,
                 globalIndex
             );
         });
         elements.wettenbankResults.innerHTML = html || "<p>Geen documenten gevonden.</p>";
     };
 
+
     const createResultItemHTML = (title, link, summary, meta, index) => {
-        const metaHTML = Object.entries(meta).map(([key, value]) => `<span><strong>${key}:</strong> ${value || 'n.v.t.'}</span>`).join('');
+        const metaHTML = Object.entries(meta)
+            .filter(([key, value]) => value && value.trim() !== 'Onbekend' && value.trim() !== '') // Filter out empty or 'Onbekend' values
+            .map(([key, value]) => `<span><strong>${key}:</strong> ${value || 'n.v.t.'}</span>`).join('');
         const summaryText = summary.length > 250 ? summary.substring(0, 250) + '...' : summary;
         return `
             <div class="result-item" data-index="${index}">
@@ -453,7 +520,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="meta-info">${metaHTML}</div>
                 <div class="summary" id="summary-${index}">${summaryText}</div>
-                ${summary.length > 250 ? `<div class="read-more" data-target="summary-${index}" data-full-summary="${encodeURIComponent(summary)}">Lees meer</div>` : ''}
+                <div class="result-item-actions">
+                    ${summary.length > 250 ? `<div class="read-more" data-target="summary-${index}" data-full-summary="${encodeURIComponent(summary)}">Lees meer</div>` : ''}
+                    <button class="tertiary-button view-document-button" 
+                            data-title="${encodeURIComponent(title)}" 
+                            data-content="${encodeURIComponent(summary)}"
+                            style="padding: 8px 16px; font-size: 0.9rem; margin-left: auto;">
+                        Bekijk document
+                    </button>
+                </div>
             </div>`;
     };
 
@@ -528,9 +603,39 @@ document.addEventListener('DOMContentLoaded', () => {
         changePage(type, page);
     };
 
+    // --- DOCUMENT VIEWER ---
+    const showDocumentViewer = (title, content) => {
+        const viewerHTML = `
+            <div class="document-viewer-card">
+                <div class="document-viewer-header">
+                    <h3>${title}</h3>
+                </div>
+                <div class="document-viewer-body">
+                    ${content}
+                </div>
+                <div class="document-viewer-footer">
+                    <button id="closeViewerButton" class="primary-button">Terug</button>
+                </div>
+            </div>
+        `;
+        elements.documentViewer.innerHTML = viewerHTML;
+        elements.documentViewer.style.display = 'flex';
+        elements.mainContainer.classList.add('main-content-hidden');
+
+        document.getElementById('closeViewerButton').addEventListener('click', hideDocumentViewer);
+    };
+
+    const hideDocumentViewer = () => {
+        elements.documentViewer.style.display = 'none';
+        elements.documentViewer.innerHTML = '';
+        elements.mainContainer.classList.remove('main-content-hidden');
+    };
+
     // --- UTILITIES & STATE MANAGEMENT ---
     const handleResultsClick = (e) => {
         const readMoreButton = e.target.closest('.read-more');
+        const viewDocumentButton = e.target.closest('.view-document-button');
+
         if (readMoreButton) {
             const targetId = readMoreButton.getAttribute('data-target');
             const summaryElement = document.getElementById(targetId);
@@ -542,6 +647,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 summaryElement.textContent = decodeURIComponent(readMoreButton.dataset.fullSummary).substring(0, 250) + '...';
                 readMoreButton.textContent = 'Lees meer';
             }
+        }
+
+        if (viewDocumentButton) {
+            const title = decodeURIComponent(viewDocumentButton.dataset.title);
+            const content = decodeURIComponent(viewDocumentButton.dataset.content);
+            showDocumentViewer(title, content);
         }
     };
     
@@ -581,7 +692,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- KEYBOARD SHORTCUTS ---
     document.addEventListener('keydown', (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); elements.quickSearchInput.focus(); }
-        if (e.key === 'Escape') { elements.creatorSuggestions.innerHTML = ''; document.activeElement.blur(); }
+        if (e.key === 'Escape') { 
+            if (elements.documentViewer.style.display === 'flex') {
+                hideDocumentViewer();
+            } else {
+                elements.creatorSuggestions.innerHTML = ''; 
+                document.activeElement.blur(); 
+            }
+        }
     });
     
     // Inject CSS for animations
