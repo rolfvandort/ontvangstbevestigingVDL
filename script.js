@@ -472,7 +472,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const query = term.querySelector('query')?.textContent;
                 html += `
                     <label class="checkbox-option">
-                        <input type="checkbox" data-facet-query="${query}" data-facet-index="${index}">
+                        <input type="checkbox" data-facet-query='${query}' data-facet-index="${index}">
                         <span class="checkmark"></span>
                         ${actualTerm} (${count})
                     </label>`;
