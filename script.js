@@ -506,7 +506,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let html = '';
         records.forEach((record, index) => {
             const globalIndex = `wettenbank-${((wettenbankCurrentPage - 1) * wettenbankResultsPerPage) + index}`;
-            const meta = record.querySelector('meta'); // Zoek binnen de meta-tag
+            const meta = record.querySelector('meta');
             
             const title = meta?.querySelector('title')?.textContent || 'Geen titel';
             const identifier = meta?.querySelector('identifier')?.textContent || '#';
@@ -514,27 +514,50 @@ document.addEventListener('DOMContentLoaded', () => {
             const creator = meta?.querySelector('creator')?.textContent || 'Onbekend';
             const dateText = meta?.querySelector('date')?.textContent;
             const formattedDate = dateText ? new Date(dateText).toLocaleDateString('nl-NL') : 'Onbekend';
-            const summary = abstract || 'Geen samenvatting beschikbaar.';
+            
+            let contentHTML;
+            if (abstract) {
+                contentHTML = abstract;
+            } else {
+                const docType = meta?.querySelector('type')?.textContent;
+                const publicationName = record.querySelector('publicatienaam')?.textContent;
+                const subject = meta?.querySelector('subject')?.textContent;
 
-            html += createResultItemHTML('wettenbank', title, identifier, summary, { "Door": creator, "Datum": formattedDate}, globalIndex);
+                contentHTML = `<div class="kenmerken-blok"><strong>Kenmerken:</strong><ul>`;
+                if (docType) contentHTML += `<li><strong>Type:</strong> ${docType}</li>`;
+                if (publicationName) contentHTML += `<li><strong>Publicatie:</strong> ${publicationName}</li>`;
+                if (subject) contentHTML += `<li><strong>Onderwerp:</strong> ${subject}</li>`;
+                contentHTML += `</ul></div>`;
+            }
+
+            html += createResultItemHTML('wettenbank', title, identifier, contentHTML, { "Door": creator, "Datum": formattedDate }, globalIndex);
         });
         elements.wettenbankResults.innerHTML = html || "<p>Geen documenten gevonden.</p>";
     };
 
-    const createResultItemHTML = (type, title, link, summary, meta, index) => {
+    const createResultItemHTML = (type, title, link, content, meta, index) => {
         const metaHTML = Object.entries(meta).map(([key, value]) => `<span><strong>${key}:</strong> ${value || 'n.v.t.'}</span>`).join('');
+        
+        const isHtmlContent = /<[a-z][\s\S]*>/i.test(content);
+        const summaryText = isHtmlContent ? content : (content.substring(0, 250) + (content.length > 250 ? '...' : ''));
+        
         let actionsHTML = `
-            ${summary.length > 250 ? `<button class="tertiary-button read-more" data-target="summary-${index}" data-full-summary="${encodeURIComponent(summary)}">Lees meer</button>` : ''}
-            <button class="tertiary-button view-document-button" data-title="${encodeURIComponent(title)}" data-content="${encodeURIComponent(summary)}">Bekijk document</button>`;
+            <button class="tertiary-button view-document-button" 
+                    data-title="${encodeURIComponent(title)}" 
+                    data-content="${encodeURIComponent(content)}">
+                Bekijk document
+            </button>`;
+
         if (type === 'jurisprudence') {
-            actionsHTML += `<button class="secondary-button search-related-laws-button" data-summary="${encodeURIComponent(summary)}">Zoek gerelateerde wetten</button>`;
+            actionsHTML += `<button class="secondary-button search-related-laws-button" data-summary="${encodeURIComponent(content)}">Zoek gerelateerde wetten</button>`;
         }
+
         return `
             <div class="result-item" data-index="${index}">
                 <div>
                     <div class="result-item-header"><h3><a href="${link}" target="_blank" rel="noopener noreferrer">${title}</a></h3></div>
                     <div class="meta-info">${metaHTML}</div>
-                    <div class="summary" id="summary-${index}">${summary.substring(0, 250)}${summary.length > 250 ? '...' : ''}</div>
+                    <div class="summary" id="summary-${index}">${summaryText}</div>
                 </div>
                 <div class="result-item-actions">${actionsHTML}</div>
             </div>`;
@@ -644,22 +667,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- UTILITIES & STATE MANAGEMENT ---
     const handleResultsClick = (e) => {
-        const readMoreButton = e.target.closest('.read-more');
         const viewDocumentButton = e.target.closest('.view-document-button');
         const searchLawsButton = e.target.closest('.search-related-laws-button');
 
-        if (readMoreButton) {
-            const targetId = readMoreButton.dataset.target;
-            const summaryElement = document.getElementById(targetId);
-            const isExpanded = summaryElement.classList.toggle('expanded');
-            if(isExpanded) {
-                summaryElement.textContent = decodeURIComponent(readMoreButton.dataset.fullSummary);
-                readMoreButton.textContent = 'Lees minder';
-            } else {
-                summaryElement.textContent = decodeURIComponent(readMoreButton.dataset.fullSummary).substring(0, 250) + '...';
-                readMoreButton.textContent = 'Lees meer';
-            }
-        }
         if (viewDocumentButton) {
             showDocumentViewer(decodeURIComponent(viewDocumentButton.dataset.title), decodeURIComponent(viewDocumentButton.dataset.content));
         }
